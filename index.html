@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solicitação de Certidão de Ocorrência</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Firebase SDKs -->
+    <!-- Inclua apenas uma vez, antes de fechar a tag </head> -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <!-- Depois dos scripts do Firebase, inclua seu arquivo de configuração -->
+    <script src="firebase-config.js"></script>
+    <!-- Somente depois, inclua seus scripts -->
+    <script src="script.js"></script>
+  </head>
+  <body>
+    <div id="imc-form">
+      <h1>Solicitação de Certidão de Ocorrência</h1>
+
+      <div class="tabs">
+        <button class="tab-button active" onclick="openTab('form-tab')">
+          Formulário
+        </button>
+        <button class="tab-button" onclick="openTab('consulta-tab')">
+          Consultar Ocorrências
+        </button>
+      </div>
+
+      <div id="form-tab" class="tab-content">
+        <form id="calc-form">
+          <div>
+            <label for="datasolicitacao">Data da Solicitação:</label>
+            <input type="text" name="datasolicitacao" id="datasolicitacao" />
+            <div id="datasolicitacao-error" style="color: red; display: none">
+              Por favor, insira a data da solicitação.
+            </div>
+          </div>
+
+          <div>
+            <label for="nome">Nome do Solicitante:</label>
+            <input type="text" name="nome" id="nome" />
+            <div id="nome-error" style="color: red; display: none">
+              Por favor, insira o seu nome completo.
+            </div>
+          </div>
+
+          <div>
+            <label for="cpf">CPF:</label>
+            <input type="number" id="cpf" name="cpf" required />
+          </div>
+
+          <div>
+            <label for="rg">RG:</label>
+            <input type="text" id="rg" name="rg" required />
+          </div>
+
+          <div>
+            <label for="dataNascimento">Data de Nascimento:</label>
+            <input
+              type="date"
+              id="dataNascimento"
+              name="dataNascimento"
+              required
+            />
+          </div>
+
+          <div>
+            <label for="email">E-mail:</label>
+            <input type="email" id="email" name="email" required />
+          </div>
+
+          <div>
+            <label for="telefone">Telefone:</label>
+            <input type="tel" id="telefone" name="telefone" required />
+          </div>
+
+          <div>
+            <label for="dataOcorrencia">Data da Ocorrência:</label>
+            <input
+              type="date"
+              id="dataOcorrencia"
+              name="dataOcorrencia"
+              required
+            />
+          </div>
+
+          <div>
+            <label for="enderecoOcorrencia">Endereço da Ocorrência:</label>
+            <input
+              type="text"
+              id="enderecoOcorrencia"
+              name="enderecoOcorrencia"
+              required
+            />
+          </div>
+
+          <div>
+            <label for="descricao">Descrição:</label>
+            <textarea
+              id="descricao"
+              name="descricao"
+              rows="4"
+              required
+            ></textarea>
+          </div>
+
+          <div>
+            <label for="documentoIdentidade">Documento de Identidade:</label>
+            <input
+              type="file"
+              id="documentoIdentidade"
+              name="documentoIdentidade"
+              accept=".pdf,.jpg,.jpeg,.png"
+              required
+            />
+            <small>Formatos aceitos: PDF, JPG, JPEG, PNG</small>
+          </div>
+
+          <div>
+            <label for="comprovanteResidencia"
+              >Comprovante de Residência:</label
+            >
+            <input
+              type="file"
+              id="comprovanteResidencia"
+              name="comprovanteResidencia"
+              accept=".pdf,.jpg,.jpeg,.png"
+              required
+            />
+            <small>Formatos aceitos: PDF, JPG, JPEG, PNG</small>
+          </div>
+
+          <div>
+            <label for="documentoCarro">Documento do Carro:</label>
+            <input
+              type="file"
+              id="documentoCarro"
+              name="documentoCarro"
+              accept=".pdf,.jpg,.jpeg,.png"
+              required
+            />
+            <small
+              >Formatos aceitos: PDF, JPG, JPEG, PNG (CRLV, CRV ou documentos
+              similares)</small
+            >
+          </div>
+
+          <div>
+            <label for="outrosDocumentos">Outros Documentos:</label>
+            <input
+              type="file"
+              id="outrosDocumentos"
+              name="outrosDocumentos"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              multiple
+            />
+            <small
+              >Formatos aceitos: PDF, JPG, JPEG, PNG, DOC, DOCX. Você pode
+              selecionar múltiplos arquivos. (Opcional)</small
+            >
+          </div>
+
+          <input type="hidden" id="categoria" name="categoria" />
+          <button type="submit">Enviar solicitação</button>
+        </form>
+      </div>
+
+      <div id="consulta-tab" class="tab-content" style="display: none">
+        <div class="search-container">
+          <h2>Consultar Ocorrências</h2>
+          <div class="search-form">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Digite o número da ocorrência ou CPF"
+            />
+            <select id="search-filter">
+              <option value="cpf">CPF</option>
+            </select>
+            <button id="search-button">Buscar</button>
+          </div>
+          <div class="filter-status">
+            <label>Filtrar por status:</label>
+            <select id="status-filter">
+              <option value="todos">Todos</option>
+              <option value="Em andamento">Pendente</option>
+              <option value="Concluído">Concluído</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="ocorrencias-container"></div>
+      </div>
+    </div>
+
+    <!-- Firebase scripts -->
+    <script src="firebase-config.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
