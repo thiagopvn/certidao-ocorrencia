@@ -1,12 +1,12 @@
 window.firebaseConfig = {
-  apiKey: "AIzaSyAefl_QBCkRg6edvVmkKc5iz0LxqpKJDIA",
-  authDomain: "certidao-ocorrencia-adca7.firebaseapp.com",
-  projectId: "certidao-ocorrencia-adca7",
-  storageBucket: "certidao-ocorrencia-adca7.firebasestorage.app",
-  messagingSenderId: "483191339614",
-  appId: "1:483191339614:web:6158307f6305f5c71852cf",
-  measurementId: "G-8HEWJE54FR",
-  databaseURL: "https://certidao-ocorrencia-adca7-default-rtdb.firebaseio.com",
+  apiKey: "AIzaSyD3tQJ5evRr8Skp9iMCLSXKIewJJWPmrII",
+  authDomain: "certidao-gocg.firebaseapp.com",
+  projectId: "certidao-gocg",
+  storageBucket: "certidao-gocg.firebasestorage.app",
+  messagingSenderId: "684546571684",
+  appId: "1:684546571684:web:c104197a7c6b1c9f7a5531",
+  measurementId: "G-YZHFGW74Y7",
+  databaseURL: "https://certidao-gocg-default-rtdb.firebaseio.com/",
 };
 
 // Inicializar Firebase APENAS SE ainda não foi inicializado

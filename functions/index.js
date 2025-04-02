@@ -8,8 +8,8 @@ admin.initializeApp();
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "certidao.gocg@gmail.com",
-    pass: "qojx cpvo gogo dzek", // Senha de app atualizada
+    user: "gocg.certidao@gmail.com",
+    pass: "fbuc rjst fqwq hbnh", // Senha de app atualizada
   },
 });
 
@@ -55,7 +55,7 @@ exports.sendCertidaoEmail = functions.https.onRequest(async (req, res) => {
 
     // Criar conteúdo do e-mail com template HTML
     const mailOptions = {
-      from: "Certidões de Ocorrência <certidao.gocg@gmail.com>",
+      from: "Certidões de Ocorrência <gocg.certidao@gmail.com>",
       to: to,
       subject:
         subject || `Certidão de Ocorrência ${occurrenceNumber} está pronta`,
@@ -177,7 +177,7 @@ exports.sendEmailOnCertidaoUpload = functions.database
 
       // Conteúdo do e-mail
       const mailOptions = {
-        from: "Certidões de Ocorrência <certidao.gocg@gmail.com>",
+        from: "Certidões de Ocorrência <gocg.certidao@gmail.com>",
         to: occurrenceData.email,
         subject: `Certidão de Ocorrência ${occurrenceNumber} está pronta`,
         html: `
