@@ -1,0 +1,6 @@
+{
+  "name": "sistema-certidoes",
+  "version": 2,
+  "public": true,
+  "rewrites": [{ "source": "/admin", "destination": "/admin.html" }]
+}
