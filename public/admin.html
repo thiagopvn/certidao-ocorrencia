@@ -1,205 +1,130 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Painel Administrativo - Certidões de Ocorrência</title>
-
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
-    />
+    <title>Admin - Certidões de Ocorrência</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="admin.css" />
     <!-- Firebase SDKs -->
+    <!-- Inclua apenas uma vez, antes de fechar a tag </head> -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <!-- Firebase Config -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
+    <!-- Depois dos scripts do Firebase, inclua seu arquivo de configuração -->
     <script src="firebase-config.js"></script>
-    <link rel="icon" type="image/png" href="/public/bolachaGOCG.png" />
+    <!-- Somente depois, inclua seus scripts -->
+    <script src="script.js"></script>
   </head>
   <body>
-    <!-- Tela de Login -->
     <div id="login-container">
-      <div class="login-card">
-        <div class="login-header">
-          <i class="fas fa-user-shield"></i>
-          <h1>Área Administrativa</h1>
-          <p>Certidões de Ocorrência</p>
+      <h1>Área Administrativa</h1>
+      <div id="login-form">
+        <div class="form-group">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" placeholder="Digite seu e-mail" />
         </div>
-        <div id="login-form">
-          <div class="form-group">
-            <label for="email">E-mail</label>
-            <div class="input-with-icon">
-              <i class="fas fa-envelope"></i>
-              <input type="email" id="email" placeholder="Digite seu e-mail" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="password">Senha</label>
-            <div class="input-with-icon">
-              <i class="fas fa-lock"></i>
-              <input
-                type="password"
-                id="password"
-                placeholder="Digite sua senha"
-              />
-            </div>
-          </div>
-          <button id="login-button">
-            <i class="fas fa-sign-in-alt"></i> Entrar
-          </button>
-          <div id="login-error" class="error-message"></div>
+        <div class="form-group">
+          <label for="password">Senha</label>
+          <input type="password" id="password" placeholder="Digite sua senha" />
         </div>
+        <button id="login-button">Entrar</button>
+        <div id="login-error" class="error-message"></div>
       </div>
     </div>
 
-    <!-- Painel Administrativo -->
-    <div id="admin-dashboard" class="dashboard-layout" style="display: none">
-      <!-- Sidebar -->
-      <aside class="dashboard-sidebar">
-        <div class="sidebar-header">
-          <h2><i class="fas fa-file-alt"></i> Certidões</h2>
-          <button id="toggle-sidebar" class="toggle-sidebar">
-            <i class="fas fa-bars"></i>
-          </button>
+    <div id="admin-dashboard" style="display: none">
+      <header class="dashboard-header">
+        <h1>Painel Administrativo - Certidões de Ocorrência</h1>
+        <div class="user-info">
+          <span id="user-email"></span>
+          <button id="logout-button">Sair</button>
         </div>
+      </header>
 
-        <div class="user-profile">
-          <div class="user-avatar">
-            <i class="fas fa-user-circle"></i>
-          </div>
-          <div class="user-info">
-            <span id="user-email">admin@example.com</span>
-            <span class="user-role">Administrador</span>
-          </div>
-        </div>
-
-        <nav class="sidebar-nav">
+      <div class="dashboard-content">
+        <div class="dashboard-sidebar">
           <ul class="nav-menu">
-            <li class="nav-item active" data-tab="pending">
-              <i class="fas fa-clock"></i>
-              <span>Pendentes</span>
-              <span class="badge" id="pending-count">0</span>
-            </li>
-            <li class="nav-item" data-tab="completed">
-              <i class="fas fa-check-circle"></i>
-              <span>Concluídos</span>
-              <span class="badge" id="completed-count">0</span>
-            </li>
-            <li class="nav-divider"></li>
-            <li class="nav-item" data-tab="settings">
-              <i class="fas fa-cog"></i>
-              <span>Configurações</span>
-            </li>
+            <li class="nav-item active" data-tab="pending">Pendentes</li>
+            <li class="nav-item" data-tab="in-analysis">Em Análise</li>
+            <li class="nav-item" data-tab="completed">Concluídos</li>
+            <li class="nav-item" data-tab="canceled">Cancelados</li>
+            <li class="nav-item" data-tab="all">Todos</li>
           </ul>
-        </nav>
-
-        <div class="sidebar-footer">
-          <button id="logout-button">
-            <i class="fas fa-sign-out-alt"></i>
-            <span>Sair</span>
-          </button>
-        </div>
-      </aside>
-
-      <!-- Conteúdo Principal -->
-      <main class="dashboard-main">
-        <header class="main-header">
-          <div class="header-title">
-            <h1 id="page-title">Solicitações Pendentes</h1>
+          <div class="dashboard-stats">
+            <div class="stat-item">
+              <span class="stat-label">Pendentes</span>
+              <span class="stat-value" id="pending-count">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Em Análise</span>
+              <span class="stat-value" id="analysis-count">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Concluídos</span>
+              <span class="stat-value" id="completed-count">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Cancelados</span>
+              <span class="stat-value" id="canceled-count">0</span>
+            </div>
           </div>
+          <div class="actions-menu">
+            <button class="action-btn" onclick="exportarCertidoesConcluidas()">
+              Exportar Certidões
+            </button>
+          </div>
+        </div>
 
-          <div class="header-actions">
-            <div class="search-container">
-              <div class="search-box">
-                <i class="fas fa-search"></i>
-                <input
-                  type="text"
-                  id="admin-search"
-                  placeholder="Buscar por número, nome ou CPF"
-                />
-              </div>
+        <div class="dashboard-main">
+          <div class="toolbar">
+            <div class="search-tool">
+              <input
+                type="text"
+                id="admin-search"
+                placeholder="Buscar por número, nome ou CPF"
+              />
               <button id="admin-search-btn">Buscar</button>
             </div>
-
-            <div class="filter-container">
-              <div class="filter-select">
-                <i class="fas fa-calendar-alt"></i>
-                <select id="date-filter">
-                  <option value="all">Todas as datas</option>
-                  <option value="today">Hoje</option>
-                  <option value="week">Esta semana</option>
-                  <option value="month">Este mês</option>
-                </select>
-              </div>
+            <div class="filter-tool">
+              <label for="date-filter">Filtrar por data:</label>
+              <select id="date-filter">
+                <option value="all">Todas as datas</option>
+                <option value="today">Hoje</option>
+                <option value="week">Esta semana</option>
+                <option value="month">Este mês</option>
+              </select>
             </div>
           </div>
-        </header>
 
-        <!-- Conteúdo das abas -->
-        <div class="content-container">
-          <!-- Aba Pendentes -->
           <div class="tab-content" id="pending-tab">
+            <h2>Solicitações Pendentes</h2>
             <div class="ocorrencias-grid" id="pending-ocorrencias"></div>
           </div>
 
-          <!-- Aba Concluídos -->
+          <div class="tab-content" id="in-analysis-tab" style="display: none">
+            <h2>Solicitações Em Análise</h2>
+            <div class="ocorrencias-grid" id="analysis-ocorrencias"></div>
+          </div>
+
           <div class="tab-content" id="completed-tab" style="display: none">
+            <h2>Solicitações Concluídas</h2>
             <div class="ocorrencias-grid" id="completed-ocorrencias"></div>
           </div>
 
-          <!-- Aba Configurações -->
-          <div class="tab-content" id="settings-tab" style="display: none">
-            <div class="settings-panel">
-              <h2>Configurações do Sistema</h2>
-              <div class="settings-form">
-                <div class="settings-group">
-                  <h3>Notificações</h3>
-                  <div class="setting-item">
-                    <label class="switch">
-                      <input type="checkbox" checked />
-                      <span class="slider round"></span>
-                    </label>
-                    <span
-                      >Enviar e-mail quando uma nova solicitação for
-                      recebida</span
-                    >
-                  </div>
-                  <div class="setting-item">
-                    <label class="switch">
-                      <input type="checkbox" checked />
-                      <span class="slider round"></span>
-                    </label>
-                    <span
-                      >Enviar e-mail quando o status da solicitação for
-                      alterado</span
-                    >
-                  </div>
-                </div>
+          <div class="tab-content" id="canceled-tab" style="display: none">
+            <h2>Solicitações Canceladas</h2>
+            <div class="ocorrencias-grid" id="canceled-ocorrencias"></div>
+          </div>
 
-                <div class="settings-group">
-                  <h3>Segurança</h3>
-                  <div class="setting-item">
-                    <label class="switch">
-                      <input type="checkbox" checked />
-                      <span class="slider round"></span>
-                    </label>
-                    <span
-                      >Permitir acesso para documentos apenas ao titular do
-                      CPF</span
-                    >
-                  </div>
-                </div>
-
-                <button class="save-settings-btn">Salvar Configurações</button>
-              </div>
-            </div>
+          <div class="tab-content" id="all-tab" style="display: none">
+            <h2>Todas as Solicitações</h2>
+            <div class="ocorrencias-grid" id="all-ocorrencias"></div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
 
     <!-- Modal para detalhes da ocorrência -->
@@ -207,96 +132,55 @@
       <div class="modal-content">
         <div class="modal-header">
           <h2 id="modal-title">Detalhes da Ocorrência</h2>
-          <span class="close"><i class="fas fa-times"></i></span>
+          <span class="close">&times;</span>
         </div>
         <div class="modal-body" id="modal-body">
           <!-- Conteúdo preenchido dinamicamente -->
         </div>
         <div class="modal-footer">
+          <div class="certidao-upload" id="certidao-upload-container">
+            <label for="certidao-file">Anexar Certidão:</label>
+            <input
+              type="file"
+              id="certidao-file"
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <small
+              >Anexe a certidão antes de mudar o status para "Concluído"</small
+            >
+          </div>
           <div class="status-update">
             <label for="status-select">Atualizar Status:</label>
             <select id="status-select">
               <option value="Pendente">Pendente</option>
+              <option value="Em Análise">Em Análise</option>
               <option value="Concluído">Concluído</option>
+              <option value="Cancelado">Cancelado</option>
             </select>
-            <button id="update-status-btn">
-              <i class="fas fa-sync-alt"></i> Atualizar
-            </button>
+            <button id="update-status-btn">Atualizar</button>
           </div>
-
-          <!-- Upload da Certidão de Ocorrência -->
-          <div id="certidao-upload-container" style="display: none">
-            <h3>
-              <i class="fas fa-file-upload"></i>
-              Upload da Certidão
-            </h3>
-            <div class="upload-area">
-              <div class="upload-dropzone" id="upload-dropzone">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <p>Arraste um arquivo ou clique para selecionar</p>
-                <input
-                  type="file"
-                  id="certidao-upload"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                />
-              </div>
-              <button id="upload-certidao-btn">
-                <i class="fas fa-upload"></i> Enviar Certidão
-              </button>
-            </div>
-          </div>
-
           <button class="close-btn">Fechar</button>
         </div>
       </div>
     </div>
 
-    <!-- Template para o card de ocorrência -->
-    <template id="ocorrencia-card-template">
-      <div class="ocorrencia-card">
-        <div class="card-status-indicator"></div>
-        <div class="card-header">
-          <div class="ocorrencia-number"></div>
-          <div class="ocorrencia-status"></div>
-        </div>
-        <div class="card-body">
-          <div class="ocorrencia-info">
-            <div class="info-row">
-              <i class="fas fa-user"></i>
-              <span class="info-label">Nome:</span>
-              <span class="info-value nome-value"></span>
-            </div>
-            <div class="info-row">
-              <i class="fas fa-id-card"></i>
-              <span class="info-label">CPF:</span>
-              <span class="info-value cpf-value"></span>
-            </div>
-            <div class="info-row">
-              <i class="fas fa-calendar"></i>
-              <span class="info-label">Data:</span>
-              <span class="info-value data-value"></span>
-            </div>
-            <div class="info-row">
-              <i class="fas fa-map-marker-alt"></i>
-              <span class="info-label">Local:</span>
-              <span class="info-value local-value"></span>
-            </div>
-            <div class="info-row certidao-row">
-              <i class="fas fa-file-alt"></i>
-              <span class="info-label">Certidão:</span>
-              <span class="info-value certidao-value"></span>
-            </div>
-          </div>
-        </div>
-        <div class="card-footer">
-          <button class="view-btn">
-            <i class="fas fa-eye"></i> Ver Detalhes
-          </button>
-        </div>
+    <!-- Notificações -->
+    <div
+      id="notifications-container"
+      class="notifications-container"
+      style="display: none"
+    >
+      <div class="notifications-header">
+        <h3>Notificações</h3>
+        <span class="close-notifications">&times;</span>
       </div>
-    </template>
+      <div class="notifications-body" id="notifications-body">
+        <!-- Notificações serão adicionadas aqui -->
+      </div>
+    </div>
 
-    <!-- Scripts -->
+    <!-- Firebase Config and Main Script -->
+    <script src="firebase-config.js"></script>
     <script src="admin.js"></script>
   </body>
 </html>

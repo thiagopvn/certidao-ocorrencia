@@ -4,239 +4,397 @@ const nodemailer = require("nodemailer");
 
 admin.initializeApp();
 
-// Configuração do transporter para envio de e-mails usando Gmail
+// Configure o transporte de e-mail com as credenciais específicas
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "gocg.certidao@gmail.com",
-    pass: "fbuc rjst fqwq hbnh", // Senha de app atualizada
+    user: functions.config().email?.user || "gocg.certidao@gmail.com",
+    pass: functions.config().email?.pass || "fbuc rjst fqwq hbnh",
   },
 });
 
-// Função Cloud HTTP para enviar e-mail quando a certidão estiver pronta
-exports.sendCertidaoEmail = functions.https.onRequest(async (req, res) => {
-  // Configurar CORS
-  res.set("Access-Control-Allow-Origin", "*");
-
-  // Responder para requisições de preflight OPTIONS
-  if (req.method === "OPTIONS") {
-    res.set("Access-Control-Allow-Methods", "POST");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-    res.set("Access-Control-Max-Age", "3600");
-    return res.status(204).send("");
+// Função para enviar e-mail chamável via HTTPS
+exports.enviarEmailCertidao = functions.https.onCall(async (data, context) => {
+  // Verificar se o usuário está autenticado
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "O usuário deve estar autenticado para enviar e-mails."
+    );
   }
 
+  const { destinatario, nome, numeroOcorrencia, certidaoURL } = data;
+
+  if (!destinatario || !nome || !numeroOcorrencia || !certidaoURL) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Faltam parâmetros obrigatórios para o envio do e-mail."
+    );
+  }
+
+  // Construir o conteúdo do e-mail
+  const mailOptions = {
+    from: '"Sistema de Certidões" <gocg.certidao@gmail.com>',
+    to: destinatario,
+    subject: `Certidão de Ocorrência ${numeroOcorrencia} - Concluída`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+        <h2 style="color: #4caf50; text-align: center;">Certidão de Ocorrência Concluída</h2>
+        
+        <p>Olá, <strong>${nome}</strong>!</p>
+        
+        <p>Temos o prazer de informar que sua solicitação de certidão de ocorrência <strong>${numeroOcorrencia}</strong> foi concluída com sucesso.</p>
+        
+        <p>Você pode acessar sua certidão através do link abaixo:</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${certidaoURL}" 
+             style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+            Baixar Certidão
+          </a>
+        </div>
+        
+        <p>Se você tiver alguma dúvida ou precisar de assistência adicional, não hesite em nos contatar.</p>
+        
+        <p>Atenciosamente,</p>
+        <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
+          <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+        </div>
+      </div>
+    `,
+  };
+
   try {
-    // Verificar método da requisição
-    if (req.method !== "POST") {
-      return res.status(405).send("Método não permitido");
-    }
-
-    // Obter dados do request
-    const { to, subject, occurrenceNumber, userName, certidaoUrl } = req.body;
-
-    // Validar parâmetros obrigatórios
-    if (!to || !occurrenceNumber || !certidaoUrl) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Parâmetros obrigatórios não fornecidos (to, occurrenceNumber, certidaoUrl)",
-      });
-    }
-
-    // Verificar formato do e-mail
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(to)) {
-      return res.status(400).json({
-        success: false,
-        message: "Formato de e-mail inválido",
-      });
-    }
-
-    // Criar conteúdo do e-mail com template HTML
-    const mailOptions = {
-      from: "Certidões de Ocorrência <gocg.certidao@gmail.com>",
-      to: to,
-      subject:
-        subject || `Certidão de Ocorrência ${occurrenceNumber} está pronta`,
-      html: `
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-            <div style="background-color: #3b82f6; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-              <h1 style="margin: 0; font-size: 24px;">Sua Certidão de Ocorrência está pronta!</h1>
-            </div>
-            
-            <div style="padding: 20px;">
-              <p>Olá, ${userName || "Solicitante"}!</p>
-              
-              <p>Temos o prazer de informar que sua Certidão de Ocorrência <strong>${occurrenceNumber}</strong> foi emitida e já está disponível para você.</p>
-              
-              <p>Você pode acessar sua certidão através do link abaixo ou entrando no nosso sistema e consultando com seu CPF.</p>
-              
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${certidaoUrl}" 
-                  style="background-color: #3b82f6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-                  Visualizar Certidão
-                </a>
-              </div>
-              
-              <p>Se você tiver qualquer dúvida, por favor, entre em contato conosco.</p>
-              
-              <p>Atenciosamente,<br>
-              Equipe de Certidões de Ocorrência</p>
-            </div>
-            
-            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; text-align: center;">
-              <p>Este é um e-mail automático. Por favor, não responda esta mensagem.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    };
-
-    // Enviar e-mail
+    // Enviar o e-mail
     await transporter.sendMail(mailOptions);
 
-    // Registrar o envio no Firebase para referência futura
+    // Registrar o envio no banco de dados
     await admin
       .database()
-      .ref(`ocorrencias/${occurrenceNumber}/notifications`)
-      .push({
-        type: "email",
-        status: "sent",
-        to: to,
+      .ref(`ocorrencias/${numeroOcorrencia}/emailEnviado`)
+      .set({
         timestamp: admin.database.ServerValue.TIMESTAMP,
+        success: true,
       });
 
-    // Retornar resposta de sucesso
-    return res.status(200).json({
-      success: true,
-      message: "E-mail enviado com sucesso",
-    });
+    return { success: true, message: "E-mail enviado com sucesso" };
   } catch (error) {
     console.error("Erro ao enviar e-mail:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Erro ao enviar e-mail",
-      error: error.message,
-    });
+
+    // Registrar a falha no banco de dados
+    await admin
+      .database()
+      .ref(`ocorrencias/${numeroOcorrencia}/emailEnviado`)
+      .set({
+        timestamp: admin.database.ServerValue.TIMESTAMP,
+        success: false,
+        error: error.message,
+      });
+
+    throw new functions.https.HttpsError(
+      "internal",
+      `Erro ao enviar e-mail: ${error.message}`
+    );
   }
 });
 
-// Função Cloud alternativa que envia e-mail automaticamente quando uma certidão for anexada
-// Esta função é ativada por evento de banco de dados
-exports.sendEmailOnCertidaoUpload = functions.database
-  .ref("/ocorrencias/{occurrenceNumber}/certidao")
-  .onWrite(async (change, context) => {
-    try {
-      // Não fazer nada se a certidão foi removida
-      if (!change.after.exists()) {
-        return null;
-      }
+// Trigger para enviar e-mail automaticamente quando o status mudar para "Concluído"
+exports.enviarEmailAutomatico = functions.database
+  .ref("/ocorrencias/{occurrenceId}")
+  .onUpdate(async (change, context) => {
+    const occurrenceId = context.params.occurrenceId;
+    const dadosAntes = change.before.val();
+    const dadosDepois = change.after.val();
 
-      // Não fazer nada se isto não é uma criação nova (é apenas uma atualização)
-      if (
-        change.before.exists() &&
-        change.before.val().url === change.after.val().url
-      ) {
-        return null;
-      }
-
-      const occurrenceNumber = context.params.occurrenceNumber;
-
-      // Obter dados da ocorrência
-      const occurrenceSnapshot = await admin
-        .database()
-        .ref(`/ocorrencias/${occurrenceNumber}`)
-        .once("value");
-
-      const occurrenceData = occurrenceSnapshot.val();
-
-      // Verificar se temos os dados necessários
-      if (
-        !occurrenceData ||
-        !occurrenceData.email ||
-        !occurrenceData.certidao
-      ) {
-        console.log("Dados insuficientes para envio de e-mail");
-        return null;
-      }
-
-      // Status deve ser concluído para enviar e-mail
-      if (occurrenceData.status !== "Concluído") {
-        console.log("Status não é Concluído, e-mail não será enviado");
-        return null;
-      }
-
-      // Conteúdo do e-mail
-      const mailOptions = {
-        from: "Certidões de Ocorrência <gocg.certidao@gmail.com>",
-        to: occurrenceData.email,
-        subject: `Certidão de Ocorrência ${occurrenceNumber} está pronta`,
-        html: `
-          <!DOCTYPE html>
-          <html lang="pt-BR">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-              <div style="background-color: #3b82f6; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-                <h1 style="margin: 0; font-size: 24px;">Sua Certidão de Ocorrência está pronta!</h1>
-              </div>
-              
-              <div style="padding: 20px;">
-                <p>Olá, ${occurrenceData.nome || "Solicitante"}!</p>
+    // Verificar se o status mudou para "Concluído" e se há uma certidão anexada
+    if (
+      dadosAntes.status !== "Concluído" &&
+      dadosDepois.status === "Concluído" &&
+      dadosDepois.certidao &&
+      dadosDepois.certidao.url
+    ) {
+      // Se não houve tentativa anterior de envio de e-mail ou a última falhou
+      if (!dadosDepois.emailEnviado || !dadosDepois.emailEnviado.success) {
+        try {
+          const mailOptions = {
+            from: '"Sistema de Certidões" <gocg.certidao@gmail.com>',
+            to: dadosDepois.email,
+            subject: `Certidão de Ocorrência ${occurrenceId} - Concluída`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #4caf50; text-align: center;">Certidão de Ocorrência Concluída</h2>
                 
-                <p>Temos o prazer de informar que sua Certidão de Ocorrência <strong>${occurrenceNumber}</strong> foi emitida e já está disponível para você.</p>
+                <p>Olá, <strong>${dadosDepois.nome}</strong>!</p>
                 
-                <p>Você pode acessar sua certidão através do link abaixo ou entrando no nosso sistema e consultando com seu CPF.</p>
+                <p>Temos o prazer de informar que sua solicitação de certidão de ocorrência <strong>${occurrenceId}</strong> foi concluída com sucesso.</p>
+                
+                <p>Você pode acessar sua certidão através do link abaixo:</p>
                 
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${occurrenceData.certidao.url}" 
-                    style="background-color: #3b82f6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-                    Visualizar Certidão
+                  <a href="${dadosDepois.certidao.url}" 
+                     style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Baixar Certidão
                   </a>
                 </div>
                 
-                <p>Se você tiver qualquer dúvida, por favor, entre em contato conosco.</p>
+                <p>Se você tiver alguma dúvida ou precisar de assistência adicional, não hesite em nos contatar.</p>
                 
-                <p>Atenciosamente,<br>
-                Equipe de Certidões de Ocorrência</p>
+                <p>Atenciosamente,</p>
+                <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
+                  <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+                </div>
               </div>
-              
-              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; text-align: center;">
-                <p>Este é um e-mail automático. Por favor, não responda esta mensagem.</p>
-              </div>
-            </div>
-          </body>
-          </html>
-        `,
-      };
+            `,
+          };
 
-      // Enviar e-mail
-      await transporter.sendMail(mailOptions);
+          // Enviar o e-mail
+          await transporter.sendMail(mailOptions);
 
-      // Registrar o envio no Firebase
-      return admin
-        .database()
-        .ref(`ocorrencias/${occurrenceNumber}/notifications`)
-        .push({
-          type: "email",
-          status: "sent",
-          to: occurrenceData.email,
-          timestamp: admin.database.ServerValue.TIMESTAMP,
-        });
-    } catch (error) {
-      console.error("Erro ao enviar e-mail automático:", error);
+          // Registrar o envio no banco de dados
+          await admin
+            .database()
+            .ref(`ocorrencias/${occurrenceId}/emailEnviado`)
+            .set({
+              timestamp: admin.database.ServerValue.TIMESTAMP,
+              success: true,
+            });
+
+          console.log(
+            `E-mail enviado automaticamente para ${dadosDepois.email}`
+          );
+          return { success: true };
+        } catch (error) {
+          console.error("Erro ao enviar e-mail automático:", error);
+
+          // Registrar a falha no banco de dados
+          await admin
+            .database()
+            .ref(`ocorrencias/${occurrenceId}/emailEnviado`)
+            .set({
+              timestamp: admin.database.ServerValue.TIMESTAMP,
+              success: false,
+              error: error.message,
+            });
+
+          return { success: false, error: error.message };
+        }
+      }
+    }
+
+    return null;
+  });
+
+// Função para registrar notificações para administradores
+exports.notificarStatusAtualizado = functions.database
+  .ref("/ocorrencias/{occurrenceId}/status")
+  .onUpdate(async (change, context) => {
+    const occurrenceId = context.params.occurrenceId;
+    const statusAnterior = change.before.val();
+    const novoStatus = change.after.val();
+
+    // Evitar processamento desnecessário se o status não mudou
+    if (statusAnterior === novoStatus) {
       return null;
+    }
+
+    // Obter informações adicionais da ocorrência
+    const snapshot = await admin
+      .database()
+      .ref(`/ocorrencias/${occurrenceId}`)
+      .once("value");
+    const ocorrencia = snapshot.val();
+
+    if (!ocorrencia) {
+      console.error(`Ocorrência ${occurrenceId} não encontrada`);
+      return null;
+    }
+
+    // Criar uma notificação no banco de dados
+    const notificacaoRef = admin.database().ref("/notificacoes").push();
+
+    await notificacaoRef.set({
+      tipo: "atualizacao_status",
+      occurrenceId: occurrenceId,
+      statusAnterior: statusAnterior,
+      novoStatus: novoStatus,
+      nomeCliente: ocorrencia.nome,
+      timestamp: admin.database.ServerValue.TIMESTAMP,
+      lida: false,
+      destinatario: "todos", // pode ser 'todos' ou o email de um admin específico
+    });
+
+    console.log(
+      `Notificação criada para mudança de status da ocorrência ${occurrenceId}`
+    );
+    return { success: true };
+  });
+
+// Função para marcar notificações como lidas
+exports.marcarNotificacaoLida = functions.https.onCall(
+  async (data, context) => {
+    // Verificar se o usuário está autenticado
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "O usuário deve estar autenticado para marcar notificações como lidas."
+      );
+    }
+
+    const { notificacaoId } = data;
+
+    if (!notificacaoId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "ID da notificação não informado."
+      );
+    }
+
+    try {
+      // Marcar a notificação como lida
+      await admin.database().ref(`/notificacoes/${notificacaoId}`).update({
+        lida: true,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("Erro ao marcar notificação como lida:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        `Erro: ${error.message}`
+      );
+    }
+  }
+);
+
+// Função para limpar notificações antigas (opcional, melhora o desempenho)
+exports.limparNotificacoesAntigas = functions.pubsub
+  .schedule("1 of month 00:00")
+  .onRun(async (context) => {
+    try {
+      // Definir limite de tempo (30 dias atrás)
+      const limiteTempo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      // Obter notificações antigas
+      const snapshot = await admin
+        .database()
+        .ref("/notificacoes")
+        .orderByChild("timestamp")
+        .endAt(limiteTempo)
+        .once("value");
+
+      if (!snapshot.exists()) {
+        console.log("Nenhuma notificação antiga para remover");
+        return null;
+      }
+
+      // Array para armazenar as promises de exclusão
+      const deletePromises = [];
+
+      // Remover cada notificação antiga
+      snapshot.forEach((childSnapshot) => {
+        deletePromises.push(
+          admin.database().ref(`/notificacoes/${childSnapshot.key}`).remove()
+        );
+      });
+
+      // Aguardar todas as exclusões
+      await Promise.all(deletePromises);
+
+      console.log(`Removidas ${deletePromises.length} notificações antigas`);
+      return { success: true, count: deletePromises.length };
+    } catch (error) {
+      console.error("Erro ao limpar notificações antigas:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+// Função para gerar relatórios de ocorrências concluídas (opcional)
+exports.gerarRelatorioMensal = functions.pubsub
+  .schedule("1 of month 00:00")
+  .onRun(async (context) => {
+    try {
+      // Obter data do mês anterior
+      const dataAtual = new Date();
+      const mesAnterior = new Date(
+        dataAtual.getFullYear(),
+        dataAtual.getMonth() - 1,
+        1
+      );
+      const inicioMesAnterior = mesAnterior.getTime();
+      const fimMesAnterior = new Date(
+        dataAtual.getFullYear(),
+        dataAtual.getMonth(),
+        0,
+        23,
+        59,
+        59
+      ).getTime();
+
+      // Obter ocorrências concluídas no mês anterior
+      const snapshot = await admin
+        .database()
+        .ref("/ocorrencias")
+        .orderByChild("dataAtualizacao")
+        .startAt(inicioMesAnterior)
+        .endAt(fimMesAnterior)
+        .once("value");
+
+      if (!snapshot.exists()) {
+        console.log("Nenhuma ocorrência para incluir no relatório mensal");
+        return null;
+      }
+
+      // Processar dados para o relatório
+      const ocorrencias = [];
+      let totalConcluidas = 0;
+      let totalPendentes = 0;
+      let totalCanceladas = 0;
+
+      snapshot.forEach((childSnapshot) => {
+        const ocorrencia = childSnapshot.val();
+        ocorrencias.push({
+          numero: ocorrencia.occurrenceNumber,
+          nome: ocorrencia.nome,
+          status: ocorrencia.status,
+          dataOcorrencia: ocorrencia.dataOcorrencia,
+          dataAtualizacao: ocorrencia.dataAtualizacao,
+        });
+
+        // Contagem por status
+        if (ocorrencia.status === "Concluído") totalConcluidas++;
+        else if (
+          ocorrencia.status === "Pendente" ||
+          ocorrencia.status === "Em Análise"
+        )
+          totalPendentes++;
+        else if (ocorrencia.status === "Cancelado") totalCanceladas++;
+      });
+
+      // Salvar relatório no banco de dados
+      const nomeMes = mesAnterior.toLocaleString("pt-BR", { month: "long" });
+      const ano = mesAnterior.getFullYear();
+
+      await admin
+        .database()
+        .ref(`/relatorios/${ano}-${mesAnterior.getMonth() + 1}`)
+        .set({
+          periodo: `${nomeMes} de ${ano}`,
+          totalOcorrencias: ocorrencias.length,
+          concluidas: totalConcluidas,
+          pendentes: totalPendentes,
+          canceladas: totalCanceladas,
+          geradoEm: admin.database.ServerValue.TIMESTAMP,
+          ocorrencias: ocorrencias,
+        });
+
+      console.log(`Relatório mensal gerado para ${nomeMes} de ${ano}`);
+      return { success: true };
+    } catch (error) {
+      console.error("Erro ao gerar relatório mensal:", error);
+      return { success: false, error: error.message };
     }
   });
