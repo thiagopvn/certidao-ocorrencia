@@ -515,7 +515,7 @@ exports.enviarEmailNovaOcorrencia = functions.database
               
               <p>Olá, <strong>${ocorrenciaData.nome}</strong>!</p>
               
-              <p>Confirmamos o recebimento da sua solicitação de certidão de ocorrência. Seu pedido foi registrado em nosso sistema e está aguardando análise.</p>
+              <p>Confirmamos o recebimento da sua solicitação de certidão de ocorrência. Seu pedido foi registrado em nosso sistema e temos o prazo de 15 dias úteis para confeccioná-la.</p>
               
               <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
                 <p style="margin: 0; font-size: 14px;">Número de Protocolo</p>
@@ -524,20 +524,20 @@ exports.enviarEmailNovaOcorrencia = functions.database
               
               <p><strong>O que acontece agora?</strong></p>
               <ul style="padding-left: 20px; line-height: 1.6;">
-                <li>Nossa equipe irá analisar sua solicitação;</li>
-                <li>Você será notificado por e-mail quando houver atualizações sobre o seu processo;</li>
+                <li>Nós iremos analisar sua solicitação;</li>
+                <li>Você pode tirar dúvidas através desse e-mail sempre que precisar;</li>
                 <li>Quando sua certidão estiver pronta, você receberá outro e-mail com um link para acessá-la.</li>
               </ul>
               
-              <p>Você pode acompanhar o status da sua solicitação a qualquer momento em nosso site, utilizando seu CPF e o número de protocolo informado acima.</p>
+              <p>Você pode acompanhar o status da sua solicitação a qualquer momento em nosso site, utilizando seu CPF na aba "Consultar Solicitações".</p>
               
-              <p>Caso tenha alguma dúvida, responda a este e-mail ou entre em contato com nosso suporte.</p>
+              <p>Caso tenha alguma dúvida, não deixe de perguntar.</p>
               
               <p>Atenciosamente,</p>
-              <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+              <p><strong>Grupamento Operacional do Comando Geral/strong></p>
               
               <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-                <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+                <p>Este é um e-mail automático. </p>
               </div>
             </div>
           `,

@@ -729,25 +729,6 @@ body {
   gap: 0.75rem;
 }
 
-.view-btn {
-  padding: 0.5rem 1rem;
-  background-color: var(--primary);
-  color: var(--white);
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 0.875rem;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.view-btn:hover {
-  background-color: var(--primary-dark);
-}
-
 /* Tabela de ocorrências */
 .ocorrencias-table {
   width: 100%;
@@ -1628,4 +1609,372 @@ body {
     max-width: 100%;
     width: 100%;
   }
+}
+
+/* Estilos aprimorados para os cards de ocorrências */
+.ocorrencia-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border-left: 5px solid var(--primary-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.ocorrencia-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.ocorrencia-card.status-pendente {
+  border-left-color: var(--warning-color);
+}
+
+.ocorrencia-card.status-concluido {
+  border-left-color: var(--success-color);
+}
+
+.card-header {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.ocorrencia-number {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--gray-800);
+}
+
+.ocorrencia-status {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ocorrencia-status.pendente {
+  background-color: var(--warning-light);
+  color: var(--warning-dark);
+}
+
+.ocorrencia-status.concluido {
+  background-color: var(--success-light);
+  color: var(--success-dark);
+}
+
+.card-body {
+  padding: 20px;
+  flex-grow: 1;
+}
+
+.ocorrencia-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--gray-200);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.info-row i {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+  font-size: 14px;
+}
+
+.info-label {
+  font-weight: 600;
+  color: var(--gray-600);
+  width: 70px;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.info-value {
+  color: var(--gray-800);
+  font-size: 14px;
+  flex-grow: 1;
+}
+
+.card-footer {
+  padding: 15px 20px;
+  background-color: #2c2c2c; /* Escurecido */
+  border-top: 1px solid #444;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Estilo específico para ocorrências pendentes */
+.ocorrencia-card.pendente .info-row i {
+  color: var(--warning-color);
+}
+
+/* Estilo específico para ocorrências concluídas */
+.ocorrencia-card.concluido .info-row i {
+  color: var(--success-color);
+}
+
+/* Estilo para link de certidão */
+.visualizar-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.visualizar-link:hover {
+  text-decoration: underline;
+  color: var(--primary-dark);
+}
+
+.certidao-row {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .ocorrencia-card {
+    margin-bottom: 15px;
+  }
+
+  .card-header {
+    padding: 12px 15px;
+  }
+
+  .card-body {
+    padding: 15px;
+  }
+
+  .info-label {
+    width: 60px;
+    font-size: 13px;
+  }
+
+  .info-value {
+    font-size: 13px;
+  }
+}
+
+/* Estilos aprimorados para os cards de ocorrências */
+.ocorrencia-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border-left: 5px solid var(--primary-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.ocorrencia-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.ocorrencia-card.status-pendente {
+  border-left-color: var(--warning-color);
+}
+
+.ocorrencia-card.status-concluido,
+.ocorrencia-card.status-concluído {
+  border-left-color: var(--success-color);
+}
+
+.card-header {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.ocorrencia-number {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--gray-800);
+}
+
+.ocorrencia-status {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ocorrencia-status.pendente {
+  background-color: var(--warning-light);
+  color: var(--warning-dark);
+}
+
+.ocorrencia-status.concluido,
+.ocorrencia-status.concluído {
+  background-color: var(--success-light);
+  color: var(--success-dark);
+}
+
+.card-body {
+  padding: 20px;
+  flex-grow: 1;
+}
+
+.ocorrencia-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--gray-200);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.info-row i {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+  font-size: 14px;
+}
+
+.info-label {
+  font-weight: 600;
+  color: var(--gray-600);
+  width: 70px;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.info-value {
+  color: var(--gray-800);
+  font-size: 14px;
+  flex-grow: 1;
+}
+
+/* Estilo específico para ocorrências pendentes */
+.ocorrencia-card.pendente .info-row i,
+.ocorrencia-card.status-pendente .info-row i {
+  color: var(--warning-color);
+}
+
+/* Estilo específico para ocorrências concluídas */
+.ocorrencia-card.concluido .info-row i,
+.ocorrencia-card.concluído .info-row i,
+.ocorrencia-card.status-concluido .info-row i,
+.ocorrencia-card.status-concluído .info-row i {
+  color: var(--success-color);
+}
+
+/* Estilo para link de certidão */
+.visualizar-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.visualizar-link:hover {
+  text-decoration: underline;
+  color: var(--primary-dark);
+}
+
+.certidao-row {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .ocorrencia-card {
+    margin-bottom: 15px;
+  }
+
+  .card-header {
+    padding: 12px 15px;
+  }
+
+  .card-body {
+    padding: 15px;
+  }
+
+  .info-label {
+    width: 60px;
+    font-size: 13px;
+  }
+
+  .info-value {
+    font-size: 13px;
+  }
+}
+
+.ocorrencias-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.view-btn {
+  background-color: #222 !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
+}
+
+.view-btn:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.view-btn i {
+  font-size: 14px;
 }

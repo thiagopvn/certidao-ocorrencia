@@ -67,8 +67,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Modal elements
   const detailModal = document.getElementById("detail-modal");
-  const modalCloseBtn = document.querySelector(".modal-content .close");
-  const modalCloseButton = document.querySelector(".modal-content .close-btn");
+  const modalCloseBtn = document.querySelector(".modal-content.close");
+  const modalCloseButton = document.querySelector(".modal-content.close-btn");
   const modalTitle = document.getElementById("modal-title");
   const modalBody = document.getElementById("modal-body");
   const statusSelect = document.getElementById("status-select");
@@ -1462,6 +1462,13 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Modal de detalhes - Fechar
+
+  if (modalCloseButton && detailModal) {
+    modalCloseButton.addEventListener("click", function () {
+      detailModal.style.display = "none";
+    });
+  }
+
   if (modalCloseBtn) {
     modalCloseBtn.addEventListener("click", function () {
       detailModal.style.display = "none";

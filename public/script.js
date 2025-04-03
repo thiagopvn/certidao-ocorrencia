@@ -137,7 +137,7 @@ document.addEventListener("DOMContentLoaded", function () {
       loadingIndicator.innerHTML = `
         <div class="processing-message">
           <i class="fas fa-sync fa-spin"></i>
-          <p>Processando sua solicitação. Por favor, aguarde e não feche esta página...</p>
+          <p>Processando sua solicitação. Isso pode demorar um pouco. Por favor, aguarde e não feche esta página...</p>
           <div class="progress-bar"><div class="progress-fill"></div></div>
         </div>
       `;
@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Exibir mensagem de sucesso com alerta mais amigável
         showSuccessMessage(
           `${formData.nome}, sua solicitação foi recebida com sucesso!`,
-          `Seu número de ocorrência é: <strong>${occurrenceNumber}</strong>. Em breve entraremos em contato pelo e-mail ou telefone informados.`
+          `Seu número de protocolo é: <strong>${occurrenceNumber}</strong>. Enviamos um email para o senhor confirmando a solicitação. Em breve entraremos novamente em contato pelo e-mail informado, não deixe de conferir a caixa de spam.`
         );
 
         // Limpar o formulário após envio bem-sucedido
