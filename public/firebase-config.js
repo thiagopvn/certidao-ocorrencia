@@ -1,13 +1,13 @@
+// firebase-config.js
 window.firebaseConfig = {
-  apiKey: "AIzaSyBkR9Jc7RjShkqwrgzU4pWa6LI4BIKx49I",
-  authDomain: "certidao-ocorrencia.firebaseapp.com",
-  databaseURL: "https://certidao-ocorrencia-default-rtdb.firebaseio.com",
-  projectId: "certidao-ocorrencia",
-  storageBucket: "certidao-ocorrencia.firebasestorage.app",
-  messagingSenderId: "848936045913",
-  appId: "1:848936045913:web:80ce9066f237d7b92dd048",
-  measurementId: "G-YVW493683H",
-  // Definir a região para as Cloud Functions (opcional)
+  apiKey: "AIzaSyD3tQJ5evRr8Skp9iMCLSXKIewJJWPmrII",
+  authDomain: "certidao-gocg.firebaseapp.com",
+  databaseURL: "https://certidao-gocg-default-rtdb.firebaseio.com",
+  projectId: "certidao-gocg",
+  storageBucket: "certidao-gocg.firebasestorage.app",
+  messagingSenderId: "684546571684",
+  appId: "1:684546571684:web:c104197a7c6b1c9f7a5531",
+  measurementId: "G-YZHFGW74Y7",
   functionsRegion: "us-central1",
 };
 
@@ -25,14 +25,11 @@ window.auth = firebase.auth();
 if (typeof firebase.functions === "function") {
   window.functions = firebase.functions();
 
-  // Definir região personalizada se especificada
-  if (window.firebaseConfig.functionsRegion) {
-    window.functions = firebase
-      .functions()
-      .useRegion(window.firebaseConfig.functionsRegion);
-  }
-
-  console.log("Firebase Functions inicializado com sucesso");
+  // Definir região personalizada se especificada - REMOVER ESTA PARTE OU CORRIGIR
+  // A linha abaixo está causando erro - remova ou substitua por:
+  // if (window.firebaseConfig.functionsRegion) {
+  //   window.functions = firebase.functions().region(window.firebaseConfig.functionsRegion);
+  // }
 }
 
 console.log("Firebase inicializado com sucesso");

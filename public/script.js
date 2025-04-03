@@ -57,6 +57,41 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   };
 
+  // Função para enviar e-mail de confirmação usando Firebase Functions
+  async function enviarEmailConfirmacao(dados) {
+    try {
+      // Certifique-se de que o firebase.functions() esteja inicializado
+      if (typeof firebase.functions !== "function") {
+        console.error("Firebase Functions não está disponível");
+        return false;
+      }
+
+      // Nome da função do Firebase que envia o e-mail de confirmação
+      const enviarEmailFunction = firebase
+        .functions()
+        .httpsCallable("enviarEmailCertidao");
+
+      // Preparar dados para envio
+      const emailData = {
+        destinatario: dados.email,
+        nome: dados.nome,
+        numeroOcorrencia: dados.occurrenceNumber,
+        certidaoURL: "#", // Sem certidão ainda, será apenas notificação da solicitação
+        tipoEmail: "confirmacao", // Indica que é um e-mail de confirmação de solicitação
+      };
+
+      // Enviar a solicitação para a função do Firebase
+      const result = await enviarEmailFunction(emailData);
+
+      console.log("E-mail de confirmação enviado com sucesso:", result);
+      return true;
+    } catch (error) {
+      console.error("Erro ao enviar e-mail de confirmação:", error);
+      // Não interrompe o fluxo principal se houver falha no envio do e-mail
+      return false;
+    }
+  }
+
   // Form submission handling
   if (formulario) {
     formulario.addEventListener("submit", async function (event) {
@@ -183,6 +218,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Salvar dados no Firebase Realtime Database
         await database.ref("ocorrencias/" + occurrenceNumber).set(formData);
+
+        // Enviar e-mail de confirmação para o solicitante
+        const emailEnviado = await enviarEmailConfirmacao(formData);
+
+        // Registrar o status do envio do e-mail de confirmação
+        if (emailEnviado) {
+          await database
+            .ref(`ocorrencias/${occurrenceNumber}/emailConfirmacao`)
+            .set({
+              timestamp: Date.now(),
+              success: true,
+            });
+        } else {
+          await database
+            .ref(`ocorrencias/${occurrenceNumber}/emailConfirmacao`)
+            .set({
+              timestamp: Date.now(),
+              success: false,
+              error: "Falha no envio do e-mail de confirmação",
+            });
+        }
 
         // Exibir mensagem de sucesso com alerta mais amigável
         showSuccessMessage(
@@ -814,6 +870,15 @@ document.addEventListener("DOMContentLoaded", function () {
     // Só mostrar o link da certidão se for o próprio CPF buscando
     const showCertidaoLink = ocorrencia.certidao && isCPFMatch;
 
+    // Verificar e mostrar o status do e-mail de confirmação, se disponível
+    const emailConfirmacaoHTML = ocorrencia.emailConfirmacao
+      ? `<p><strong>E-mail de confirmação:</strong> ${
+          ocorrencia.emailConfirmacao.success
+            ? '<span class="email-status-success">Enviado com sucesso</span>'
+            : '<span class="email-status-failed">Falha no envio</span>'
+        }</p>`
+      : "";
+
     modalContent.innerHTML = `
     <div class="modal-header">
       <h2>Detalhes da Ocorrência ${ocorrencia.occurrenceNumber}</h2>
@@ -825,6 +890,7 @@ document.addEventListener("DOMContentLoaded", function () {
           .toLowerCase()
           .replace(" ", "-")
           .replace("í", "i")}">${ocorrencia.status}</span></h3>
+        ${emailConfirmacaoHTML}
         ${
           ocorrencia.certidao
             ? showCertidaoLink
@@ -1083,6 +1149,31 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
   });
+
+  // Adicionar estilo para exibir o status do e-mail de confirmação
+  const emailStatusStyles = document.createElement("style");
+  emailStatusStyles.textContent = `
+    .email-status-success {
+      display: inline-block;
+      padding: 2px 8px;
+      background-color: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .email-status-failed {
+      display: inline-block;
+      padding: 2px 8px;
+      background-color: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+  `;
+  document.head.appendChild(emailStatusStyles);
 
   // Inicializar a aba de consulta se estiver ativa
   if (

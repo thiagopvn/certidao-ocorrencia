@@ -1,4 +1,42 @@
+/**
+ * Sistema de Certidões de Ocorrência - Painel Administrativo
+ * Versão: 2.0.0
+ * Data de atualização: 02/04/2025
+ *
+ * Este arquivo contém todas as funções do painel administrativo,
+ * incluindo autenticação, gerenciamento de ocorrências, uploads de documentos
+ * e integração com o Firebase (Database, Storage, Auth e Functions).
+ */
+function log(mensagem, tipo = "log", dados = null) {
+  const timestamp = new Date().toISOString();
+  const prefixo = `[${timestamp}] ADMIN:`;
+
+  try {
+    if (dados) {
+      if (tipo === "log") console.log(prefixo, mensagem, dados);
+      else if (tipo === "error") console.error(prefixo, mensagem, dados);
+      else if (tipo === "warn") console.warn(prefixo, mensagem, dados);
+      else if (tipo === "info") console.info(prefixo, mensagem, dados);
+      else console.log(prefixo, mensagem, dados);
+    } else {
+      if (tipo === "log") console.log(prefixo, mensagem);
+      else if (tipo === "error") console.error(prefixo, mensagem);
+      else if (tipo === "warn") console.warn(prefixo, mensagem);
+      else if (tipo === "info") console.info(prefixo, mensagem);
+      else console.log(prefixo, mensagem);
+    }
+  } catch (e) {
+    console.log(prefixo, mensagem, dados);
+  }
+}
+
+let ocorrenciasCache = null;
+let ultimaAtualizacaoCache = 0;
+const TEMPO_EXPIRACAO_CACHE = 5 * 60 * 1000; // 5 minutos
+
 document.addEventListener("DOMContentLoaded", function () {
+  // ===== ELEMENTOS DO DOM =====
+
   // Login elements
   const loginContainer = document.getElementById("login-container");
   const loginForm = document.getElementById("login-form");
@@ -35,195 +73,628 @@ document.addEventListener("DOMContentLoaded", function () {
   const modalBody = document.getElementById("modal-body");
   const statusSelect = document.getElementById("status-select");
   const updateStatusBtn = document.getElementById("update-status-btn");
+  const certidaoFileInput = document.getElementById("certidao-file");
+
+  // Notifications
+  const notificationsContainer = document.getElementById(
+    "notifications-container"
+  );
+  const notificationsBody = document.getElementById("notifications-body");
+  const closeNotifications = document.querySelector(".close-notifications");
 
   // Current occurrence being viewed
   let currentOccurrence = null;
 
-  // ----- Authentication functions -----
+  // Cache para dados
 
-  // Handle login attempt
-  if (loginButton) {
-    loginButton.addEventListener("click", function () {
-      const email = emailInput.value.trim();
-      const password = passwordInput.value;
+  // Estado da UI
+  let isLoading = false;
+  let isUploading = false;
+  let filtroBusca = "";
+  let filtroData = "all";
 
+  // ===== FUNÇÕES DE UTILIDADE =====
+
+  /**
+   * Formata uma data para exibição
+   * @param {number} timestamp - Timestamp em milissegundos
+   * @param {boolean} incluirHora - Se deve incluir a hora
+   * @returns {string} Data formatada no padrão brasileiro
+   */
+  function formatarData(timestamp, incluirHora = false) {
+    if (!timestamp) return "N/A";
+
+    const data = new Date(timestamp);
+
+    if (incluirHora) {
+      return data.toLocaleString("pt-BR");
+    } else {
+      return data.toLocaleDateString("pt-BR");
+    }
+  }
+
+  /**
+   * Formata um CPF para exibição
+   * @param {string} cpf - CPF sem formatação
+   * @returns {string} CPF formatado
+   */
+  function formatarCPF(cpf) {
+    if (!cpf) return "";
+
+    // Remove caracteres não numéricos
+    cpf = cpf.replace(/\D/g, "");
+
+    // Aplica a formatação
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  }
+
+  /**
+   * Formata um número de telefone para exibição
+   * @param {string} telefone - Telefone sem formatação
+   * @returns {string} Telefone formatado
+   */
+  function formatarTelefone(telefone) {
+    if (!telefone) return "";
+
+    // Remove caracteres não numéricos
+    telefone = telefone.replace(/\D/g, "");
+
+    // Aplica a formatação de acordo com o comprimento
+    if (telefone.length === 11) {
+      return telefone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+    } else if (telefone.length === 10) {
+      return telefone.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+    } else {
+      return telefone;
+    }
+  }
+
+  /**
+   * Trunca texto para exibição
+   * @param {string} texto - Texto a ser truncado
+   * @param {number} tamanho - Tamanho máximo
+   * @returns {string} Texto truncado
+   */
+  function truncarTexto(texto, tamanho = 100) {
+    if (!texto) return "";
+
+    if (texto.length <= tamanho) {
+      return texto;
+    }
+
+    return texto.substring(0, tamanho) + "...";
+  }
+
+  /**
+   * Exibe uma mensagem de alerta personalizada
+   * @param {string} mensagem - Mensagem a ser exibida
+   * @param {string} tipo - Tipo de alerta (success, error, warning, info)
+   */
+  function mostrarAlerta(mensagem, tipo = "info") {
+    // Verifica se já existe um alerta ativo
+    const alertaExistente = document.querySelector(".alerta-personalizado");
+    if (alertaExistente) {
+      alertaExistente.remove();
+    }
+
+    // Cria o elemento de alerta
+    const alerta = document.createElement("div");
+    alerta.className = `alerta-personalizado ${tipo}`;
+    alerta.innerHTML = `
+      <span class="alerta-icone">
+        ${
+          tipo === "success"
+            ? "✓"
+            : tipo === "error"
+            ? "✕"
+            : tipo === "warning"
+            ? "⚠"
+            : "ℹ"
+        }
+      </span>
+      <span class="alerta-mensagem">${mensagem}</span>
+      <button class="alerta-fechar">×</button>
+    `;
+
+    // Adiciona o alerta ao DOM
+    document.body.appendChild(alerta);
+
+    // Configura o botão de fechar
+    const botaoFechar = alerta.querySelector(".alerta-fechar");
+    botaoFechar.addEventListener("click", () => {
+      alerta.classList.add("saindo");
+      setTimeout(() => {
+        alerta.remove();
+      }, 300);
+    });
+
+    // Remove o alerta após 5 segundos
+    setTimeout(() => {
+      if (document.body.contains(alerta)) {
+        alerta.classList.add("saindo");
+        setTimeout(() => {
+          alerta.remove();
+        }, 300);
+      }
+    }, 5000);
+  }
+
+  /**
+   * Mostra um indicador de loading
+   * @param {HTMLElement} container - Elemento que receberá o indicador
+   * @param {string} mensagem - Mensagem a ser exibida
+   */
+  function mostrarLoading(container, mensagem = "Carregando...") {
+    container.innerHTML = `
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <p>${mensagem}</p>
+      </div>
+    `;
+  }
+
+  /**
+   * Mostra uma mensagem de erro
+   * @param {HTMLElement} container - Elemento que receberá a mensagem
+   * @param {string} mensagem - Mensagem a ser exibida
+   */
+  function mostrarErro(
+    container,
+    mensagem = "Ocorreu um erro. Tente novamente."
+  ) {
+    container.innerHTML = `
+      <div class="error-message">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>${mensagem}</p>
+      </div>
+    `;
+  }
+
+  /**
+   * Mostra uma mensagem de dados vazios
+   * @param {HTMLElement} container - Elemento que receberá a mensagem
+   * @param {string} mensagem - Mensagem a ser exibida
+   */
+  function mostrarVazio(container, mensagem = "Nenhum dado encontrado.") {
+    container.innerHTML = `
+      <div class="no-data">
+        <i class="fas fa-search"></i>
+        <p>${mensagem}</p>
+      </div>
+    `;
+  }
+
+  /**
+   * Verifica se um valor existe (não é null, undefined, NaN ou string vazia)
+   * @param {*} valor - Valor a ser verificado
+   * @returns {boolean} Se o valor existe
+   */
+  function valorExiste(valor) {
+    return (
+      valor !== null &&
+      valor !== undefined &&
+      valor !== "" &&
+      !Number.isNaN(valor)
+    );
+  }
+
+  /**
+   * Registra um log no console com timestamp
+   * @param {string} mensagem - Mensagem a ser logada
+   * @param {string} tipo - Tipo de log (log, error, warn, info)
+   * @param {*} dados - Dados adicionais para logar
+   */
+
+  // ===== FUNÇÕES DE AUTENTICAÇÃO =====
+
+  /**
+   * Tenta fazer login com Firebase Auth
+   * @param {string} email - Email do usuário
+   * @param {string} password - Senha do usuário
+   * @returns {Promise} Promise resolvida com o usuário
+   */
+  async function fazerLogin(email, password) {
+    try {
+      // Validar entradas
       if (!email || !password) {
-        loginError.textContent = "Por favor, preencha todos os campos.";
-        return;
+        throw new Error("Por favor, preencha todos os campos.");
       }
 
-      // Show loading state
+      // Mostrar estado de loading
       loginButton.textContent = "Entrando...";
       loginButton.disabled = true;
       loginError.textContent = "";
 
-      // Sign in with Firebase Auth
-      firebase
+      // Tentar autenticar
+      log(`Tentando login para: ${email}`);
+      const userCredential = await firebase
         .auth()
-        .signInWithEmailAndPassword(email, password)
-        .then((userCredential) => {
-          // Login successful
-          const user = userCredential.user;
-          console.log("Login successful for:", user.email);
+        .signInWithEmailAndPassword(email, password);
+      const user = userCredential.user;
 
-          // Switch to dashboard view
-          loginContainer.style.display = "none";
-          adminDashboard.style.display = "block";
+      log(`Login bem-sucedido para: ${user.email}`);
 
-          // Set user email in header
-          userEmail.textContent = user.email;
+      // Verificar se o usuário tem acesso administrativo
+      const isAdmin = await verificarPerfilAdmin(user.uid);
 
-          // Load dashboard data
-          loadDashboardData();
-        })
-        .catch((error) => {
-          // Handle errors
-          console.error("Login error:", error.code, error.message);
+      if (!isAdmin) {
+        await firebase.auth().signOut();
+        throw new Error("Este usuário não tem permissão de administrador.");
+      }
 
-          if (
-            error.code === "auth/user-not-found" ||
-            error.code === "auth/wrong-password"
-          ) {
-            loginError.textContent = "E-mail ou senha incorretos.";
-          } else if (error.code === "auth/invalid-email") {
-            loginError.textContent = "E-mail inválido.";
-          } else {
-            loginError.textContent = "Erro ao fazer login. Tente novamente.";
-          }
-        })
-        .finally(() => {
-          // Reset button state
-          loginButton.textContent = "Entrar";
-          loginButton.disabled = false;
-        });
-    });
-  }
+      return user;
+    } catch (error) {
+      log(`Erro de login: ${error.message}`, "error", error);
 
-  // Handle logout
-  if (logoutButton) {
-    logoutButton.addEventListener("click", function () {
-      firebase
-        .auth()
-        .signOut()
-        .then(() => {
-          // Sign-out successful
-          adminDashboard.style.display = "none";
-          loginContainer.style.display = "block";
+      // Traduzir mensagens de erro
+      let mensagemErro = "Erro ao fazer login. Tente novamente.";
 
-          // Clear login form
-          emailInput.value = "";
-          passwordInput.value = "";
-        })
-        .catch((error) => {
-          console.error("Logout error:", error);
-          alert("Erro ao fazer logout. Tente novamente.");
-        });
-    });
-  }
+      if (
+        error.code === "auth/user-not-found" ||
+        error.code === "auth/wrong-password"
+      ) {
+        mensagemErro = "E-mail ou senha incorretos.";
+      } else if (error.code === "auth/invalid-email") {
+        mensagemErro = "E-mail inválido.";
+      } else if (error.code === "auth/user-disabled") {
+        mensagemErro = "Esta conta foi desativada.";
+      } else if (error.code === "auth/too-many-requests") {
+        mensagemErro =
+          "Muitas tentativas de login. Tente novamente mais tarde.";
+      } else if (error.message) {
+        mensagemErro = error.message;
+      }
 
-  // Check authentication state on page load
-  firebase.auth().onAuthStateChanged((user) => {
-    if (user) {
-      // User is signed in
-      loginContainer.style.display = "none";
-      adminDashboard.style.display = "block";
-      userEmail.textContent = user.email;
-
-      // Load dashboard data
-      loadDashboardData();
-    } else {
-      // User is signed out
-      loginContainer.style.display = "block";
-      adminDashboard.style.display = "none";
+      throw new Error(mensagemErro);
+    } finally {
+      // Restaurar estado do botão
+      loginButton.textContent = "Entrar";
+      loginButton.disabled = false;
     }
-  });
-
-  // ----- Dashboard functions -----
-
-  // Tab navigation
-  navItems.forEach((item) => {
-    item.addEventListener("click", function () {
-      // Remove active class from all items
-      navItems.forEach((nav) => nav.classList.remove("active"));
-
-      // Add active class to clicked item
-      this.classList.add("active");
-
-      // Hide all tab contents
-      tabContents.forEach((tab) => (tab.style.display = "none"));
-
-      // Show selected tab content
-      const tabId = this.getAttribute("data-tab") + "-tab";
-      document.getElementById(tabId).style.display = "block";
-
-      // Refresh data for the tab
-      loadTabData(this.getAttribute("data-tab"));
-    });
-  });
-
-  // Load all dashboard data
-  function loadDashboardData() {
-    // Get all occurrences from Firebase
-    database
-      .ref("ocorrencias")
-      .once("value")
-      .then((snapshot) => {
-        if (snapshot.exists()) {
-          const ocorrencias = [];
-
-          snapshot.forEach((childSnapshot) => {
-            ocorrencias.push({
-              id: childSnapshot.key,
-              ...childSnapshot.val(),
-            });
-          });
-
-          // Update stats counters
-          updateStats(ocorrencias);
-
-          // Load data for the active tab
-          const activeTab = document
-            .querySelector(".nav-item.active")
-            .getAttribute("data-tab");
-          loadTabData(activeTab, ocorrencias);
-        }
-      })
-      .catch((error) => {
-        console.error("Error loading dashboard data:", error);
-        alert("Erro ao carregar dados. Por favor, recarregue a página.");
-      });
   }
 
-  // Update dashboard statistics
-  function updateStats(ocorrencias) {
+  /**
+   * Verifica se um usuário tem perfil de administrador
+   * @param {string} uid - ID do usuário
+   * @returns {Promise<boolean>} Promise resolvida com boolean
+   */
+  async function verificarPerfilAdmin(uid) {
+    try {
+      // Verificar nas configurações de usuário
+      const snapshot = await firebase
+        .database()
+        .ref(`admin_users/${uid}`)
+        .once("value");
+      return snapshot.exists() && snapshot.val() === true;
+    } catch (error) {
+      log(`Erro ao verificar perfil admin: ${error.message}`, "error", error);
+      return false;
+    }
+  }
+
+  /**
+   * Faz logout do usuário
+   * @returns {Promise} Promise resolvida após logout
+   */
+  async function fazerLogout() {
+    try {
+      log("Iniciando logout");
+      await firebase.auth().signOut();
+      log("Logout realizado com sucesso");
+
+      // Limpar dados do formulário de login
+      emailInput.value = "";
+      passwordInput.value = "";
+
+      // Limpar cache
+      ocorrenciasCache = null;
+
+      return true;
+    } catch (error) {
+      log(`Erro ao fazer logout: ${error.message}`, "error", error);
+      mostrarAlerta(`Erro ao fazer logout: ${error.message}`, "error");
+      throw new Error("Erro ao fazer logout. Tente novamente.");
+    }
+    // Removi o bloco finally que estava relacionado a exportação de certidões
+  }
+
+  /**
+   * Validar arquivo de certidão antes do upload
+   * @param {File} file - Arquivo a ser validado
+   * @returns {boolean} Se o arquivo é válido
+   */
+  function validarArquivoCertidao(file) {
+    if (!file) return false;
+
+    // Verificar tipo de arquivo
+    const tiposPermitidos = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+    ];
+
+    if (!tiposPermitidos.includes(file.type)) {
+      mostrarAlerta(
+        "Tipo de arquivo não permitido. Por favor, use PDF, JPG ou PNG.",
+        "error"
+      );
+      return false;
+    }
+
+    // Verificar tamanho (máximo 10MB)
+    const tamanhoMaximo = 10 * 1024 * 1024; // 10MB em bytes
+    if (file.size > tamanhoMaximo) {
+      mostrarAlerta(
+        `O arquivo é muito grande (${(file.size / 1024 / 1024).toFixed(
+          2
+        )}MB). O tamanho máximo permitido é 10MB.`,
+        "error"
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  // ===== FUNÇÕES DE GERENCIAMENTO DE NOTIFICAÇÕES =====
+
+  /**
+   * Carrega notificações não lidas
+   * @returns {Promise<Array>} Promise resolvida com array de notificações
+   */
+  async function carregarNotificacoesNaoLidas() {
+    try {
+      // Obter usuário atual
+      const user = firebase.auth().currentUser;
+      if (!user) return [];
+
+      // Referência para notificações
+      const notificacoesRef = firebase.database().ref("notificacoes");
+
+      // Obter todas as notificações não lidas para este usuário
+      const snapshot = await notificacoesRef
+        .orderByChild("lida")
+        .equalTo(false)
+        .once("value");
+
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      const notificacoes = [];
+
+      snapshot.forEach((childSnapshot) => {
+        const notificacao = childSnapshot.val();
+
+        // Verificar se a notificação é para todos ou para este usuário específico
+        if (
+          notificacao.destinatario === "todos" ||
+          notificacao.destinatario === user.email
+        ) {
+          notificacoes.push({
+            id: childSnapshot.key,
+            ...notificacao,
+          });
+        }
+      });
+
+      // Ordenar por timestamp (mais recentes primeiro)
+      notificacoes.sort((a, b) => b.timestamp - a.timestamp);
+
+      return notificacoes;
+    } catch (error) {
+      log(`Erro ao carregar notificações: ${error.message}`, "error", error);
+      return [];
+    }
+  }
+
+  /**
+   * Marcar uma notificação como lida
+   * @param {string} notificacaoId - ID da notificação
+   * @returns {Promise} Promise resolvida após atualização
+   */
+  async function marcarNotificacaoLida(notificacaoId) {
+    try {
+      const user = firebase.auth().currentUser;
+      if (!user) throw new Error("Usuário não autenticado");
+
+      // Verificar se o módulo de functions está disponível
+      if (firebase.functions) {
+        // Usar Cloud Function para marcar como lida
+        const marcarLidaFunction = firebase
+          .functions()
+          .httpsCallable("marcarNotificacaoLida");
+        await marcarLidaFunction({ notificacaoId });
+      } else {
+        // Fallback para atualização direta
+        await firebase.database().ref(`notificacoes/${notificacaoId}`).update({
+          lida: true,
+        });
+      }
+
+      return true;
+    } catch (error) {
+      log(
+        `Erro ao marcar notificação como lida: ${error.message}`,
+        "error",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Atualiza o indicador de notificações na interface
+   * @param {number} count - Quantidade de notificações não lidas
+   */
+  function atualizarIndicadorNotificacoes(count) {
+    // Implementar a atualização do indicador visual de notificações
+    const notificationIcon = document.querySelector(".notification-icon");
+    const notificationBadge = document.querySelector(".notification-badge");
+
+    if (notificationIcon && notificationBadge) {
+      if (count > 0) {
+        notificationBadge.textContent = count > 99 ? "99+" : count;
+        notificationBadge.style.display = "flex";
+      } else {
+        notificationBadge.style.display = "none";
+      }
+    }
+  }
+
+  /**
+   * Renderiza as notificações na interface
+   * @param {Array} notificacoes - Array de notificações
+   */
+  function renderizarNotificacoes(notificacoes) {
+    if (!notificationsBody) return;
+
+    // Limpar o conteúdo atual
+    notificationsBody.innerHTML = "";
+
+    if (notificacoes.length === 0) {
+      notificationsBody.innerHTML = `
+        <div class="notification-empty">
+          <i class="fas fa-bell-slash"></i>
+          <p>Não há notificações novas.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Renderizar cada notificação
+    notificacoes.forEach((notificacao) => {
+      const notificacaoElement = document.createElement("div");
+      notificacaoElement.className = `notification-item ${
+        notificacao.lida ? "" : "unread"
+      }`;
+      notificacaoElement.setAttribute("data-id", notificacao.id);
+
+      // Formatar data
+      const dataNotificacao = formatarData(notificacao.timestamp, true);
+
+      // Conteúdo baseado no tipo de notificação
+      let conteudo = "";
+
+      if (notificacao.tipo === "atualizacao_status") {
+        conteudo = `
+          <strong>${notificacao.nomeCliente}</strong> teve o status da ocorrência 
+          <strong>${notificacao.occurrenceId}</strong> alterado de 
+          <strong>${notificacao.statusAnterior}</strong> para 
+          <strong>${notificacao.novoStatus}</strong>.
+        `;
+      } else {
+        conteudo = notificacao.mensagem || "Nova notificação recebida.";
+      }
+
+      notificacaoElement.innerHTML = `
+        <div class="notification-content">${conteudo}</div>
+        <div class="notification-date">${dataNotificacao}</div>
+        <button class="notification-mark-read" title="Marcar como lida">
+          <i class="fas fa-check"></i>
+        </button>
+      `;
+
+      // Adicionar à lista
+      notificationsBody.appendChild(notificacaoElement);
+
+      // Evento para marcar como lida
+      const markReadBtn = notificacaoElement.querySelector(
+        ".notification-mark-read"
+      );
+      if (markReadBtn) {
+        markReadBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await marcarNotificacaoLida(notificacao.id);
+            notificacaoElement.classList.remove("unread");
+            verificarNotificacoesLidas();
+          } catch (error) {
+            mostrarAlerta("Erro ao marcar notificação como lida", "error");
+          }
+        });
+      }
+
+      // Evento para abrir detalhes da ocorrência
+      if (notificacao.occurrenceId) {
+        notificacaoElement.addEventListener("click", () => {
+          viewOcorrenciaDetails(notificacao.occurrenceId);
+
+          // Fechar painel de notificações
+          if (notificationsContainer) {
+            notificationsContainer.style.display = "none";
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Verifica notificações não lidas e atualiza UI
+   */
+  async function verificarNotificacoesLidas() {
+    try {
+      const notificacoes = await carregarNotificacoesNaoLidas();
+      atualizarIndicadorNotificacoes(notificacoes.length);
+
+      // Renderizar notificações se o painel estiver aberto
+      if (
+        notificationsContainer &&
+        notificationsContainer.style.display === "block"
+      ) {
+        renderizarNotificacoes(notificacoes);
+      }
+
+      return notificacoes.length;
+    } catch (error) {
+      log(`Erro ao verificar notificações: ${error.message}`, "error", error);
+      return 0;
+    }
+  }
+
+  // ===== FUNÇÕES DE INTERFACE DE USUÁRIO =====
+
+  /**
+   * Atualiza as estatísticas do dashboard
+   * @param {Array} ocorrencias - Array de ocorrências
+   */
+  function atualizarEstatisticas(ocorrencias) {
     const stats = {
-      pending: 0,
-      analysis: 0,
-      completed: 0,
-      canceled: 0,
+      pendentes: 0,
+      analise: 0,
+      concluidas: 0,
+      canceladas: 0,
     };
 
     ocorrencias.forEach((ocorrencia) => {
       if (ocorrencia.status === "Pendente") {
-        stats.pending++;
+        stats.pendentes++;
       } else if (ocorrencia.status === "Em Análise") {
-        stats.analysis++;
+        stats.analise++;
       } else if (ocorrencia.status === "Concluído") {
-        stats.completed++;
+        stats.concluidas++;
       } else if (ocorrencia.status === "Cancelado") {
-        stats.canceled++;
+        stats.canceladas++;
       }
     });
 
-    // Update UI counters
-    pendingCount.textContent = stats.pending;
-    analysisCount.textContent = stats.analysis;
-    completedCount.textContent = stats.completed;
-    canceledCount.textContent = stats.canceled;
+    // Atualizar contadores na UI
+    if (pendingCount) pendingCount.textContent = stats.pendentes;
+    if (analysisCount) analysisCount.textContent = stats.analise;
+    if (completedCount) completedCount.textContent = stats.concluidas;
+    if (canceledCount) canceledCount.textContent = stats.canceladas;
+
+    return stats;
   }
 
-  // Load data for specific tab
-  function loadTabData(tabName, cachedData = null) {
+  /**
+   * Carrega dados para uma aba específica
+   * @param {string} tabName - Nome da aba
+   * @param {Array} cachedData - Dados em cache (opcional)
+   */
+  async function carregarDadosAba(tabName, cachedData = null) {
+    // Mapear nomes de abas para IDs de containers
     const containerIds = {
       pending: "pending-ocorrencias",
       "in-analysis": "analysis-ocorrencias",
@@ -237,475 +708,435 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!container) return;
 
-    // Show loading
-    container.innerHTML =
-      '<div class="loading-data">Carregando ocorrências...</div>';
+    // Mostrar loading
+    mostrarLoading(container, "Carregando ocorrências...");
 
-    // Use cached data if provided, otherwise fetch from Firebase
-    const dataPromise = cachedData
-      ? Promise.resolve(cachedData)
-      : database
-          .ref("ocorrencias")
-          .once("value")
-          .then((snapshot) => {
-            if (!snapshot.exists()) return [];
+    try {
+      // Usar dados em cache ou carregar do Firebase
+      const ocorrencias = cachedData || (await carregarOcorrencias());
 
-            const ocorrencias = [];
-            snapshot.forEach((childSnapshot) => {
-              ocorrencias.push({
-                id: childSnapshot.key,
-                ...childSnapshot.val(),
-              });
-            });
+      // Aplicar filtros
+      let ocorrenciasFiltradas = filtrarOcorrenciasPorAba(ocorrencias, tabName);
+      ocorrenciasFiltradas = aplicarFiltroData(
+        ocorrenciasFiltradas,
+        dateFilter.value
+      );
+      ocorrenciasFiltradas = aplicarFiltroBusca(
+        ocorrenciasFiltradas,
+        adminSearch.value.trim().toLowerCase()
+      );
 
-            return ocorrencias;
-          });
+      // Ordenar por timestamp (mais recentes primeiro)
+      ocorrenciasFiltradas.sort((a, b) => b.timestamp - a.timestamp);
 
-    dataPromise
-      .then((ocorrencias) => {
-        // Filter by tab
-        let filteredOcorrencias;
-
-        if (tabName === "pending") {
-          filteredOcorrencias = ocorrencias.filter(
-            (o) => o.status === "Pendente"
-          );
-        } else if (tabName === "in-analysis") {
-          filteredOcorrencias = ocorrencias.filter(
-            (o) => o.status === "Em Análise"
-          );
-        } else if (tabName === "completed") {
-          filteredOcorrencias = ocorrencias.filter(
-            (o) => o.status === "Concluído"
-          );
-        } else if (tabName === "canceled") {
-          filteredOcorrencias = ocorrencias.filter(
-            (o) => o.status === "Cancelado"
-          );
-        } else {
-          filteredOcorrencias = ocorrencias;
-        }
-
-        // Apply date filter if selected
-        const dateFilterValue = dateFilter.value;
-        if (dateFilterValue !== "all") {
-          const now = new Date();
-          const today = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate()
-          ).getTime();
-
-          if (dateFilterValue === "today") {
-            filteredOcorrencias = filteredOcorrencias.filter((o) => {
-              const timestamp = o.timestamp;
-              return timestamp >= today;
-            });
-          } else if (dateFilterValue === "week") {
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - now.getDay());
-            weekStart.setHours(0, 0, 0, 0);
-
-            filteredOcorrencias = filteredOcorrencias.filter((o) => {
-              const timestamp = o.timestamp;
-              return timestamp >= weekStart.getTime();
-            });
-          } else if (dateFilterValue === "month") {
-            const monthStart = new Date(
-              now.getFullYear(),
-              now.getMonth(),
-              1
-            ).getTime();
-
-            filteredOcorrencias = filteredOcorrencias.filter((o) => {
-              const timestamp = o.timestamp;
-              return timestamp >= monthStart;
-            });
-          }
-        }
-
-        // Sort by timestamp (newest first)
-        filteredOcorrencias.sort((a, b) => b.timestamp - a.timestamp);
-
-        // Render occurrences
-        renderOcorrencias(containerId, filteredOcorrencias);
-      })
-      .catch((error) => {
-        console.error("Error loading tab data:", error);
-        container.innerHTML =
-          '<div class="error-message">Erro ao carregar dados. Por favor, tente novamente.</div>';
-      });
+      // Renderizar ocorrências
+      renderizarOcorrencias(containerId, ocorrenciasFiltradas);
+    } catch (error) {
+      log(
+        `Erro ao carregar dados da aba ${tabName}: ${error.message}`,
+        "error",
+        error
+      );
+      mostrarErro(container, `Erro ao carregar dados: ${error.message}`);
+    }
   }
 
-  // Render occurrences in a container
-  function renderOcorrencias(containerId, ocorrencias) {
+  /**
+   * Filtra ocorrências por aba
+   * @param {Array} ocorrencias - Lista de ocorrências
+   * @param {string} tabName - Nome da aba
+   * @returns {Array} Ocorrências filtradas
+   */
+  function filtrarOcorrenciasPorAba(ocorrencias, tabName) {
+    if (tabName === "pending") {
+      return ocorrencias.filter((o) => o.status === "Pendente");
+    } else if (tabName === "in-analysis") {
+      return ocorrencias.filter((o) => o.status === "Em Análise");
+    } else if (tabName === "completed") {
+      return ocorrencias.filter((o) => o.status === "Concluído");
+    } else if (tabName === "canceled") {
+      return ocorrencias.filter((o) => o.status === "Cancelado");
+    } else {
+      return ocorrencias;
+    }
+  }
+
+  /**
+   * Aplica filtro de data às ocorrências
+   * @param {Array} ocorrencias - Lista de ocorrências
+   * @param {string} filtro - Tipo de filtro (all, today, week, month)
+   * @returns {Array} Ocorrências filtradas
+   */
+  function aplicarFiltroData(ocorrencias, filtro) {
+    if (filtro === "all") {
+      return ocorrencias;
+    }
+
+    const agora = new Date();
+    const hoje = new Date(
+      agora.getFullYear(),
+      agora.getMonth(),
+      agora.getDate()
+    ).getTime();
+
+    if (filtro === "today") {
+      return ocorrencias.filter((o) => o.timestamp >= hoje);
+    } else if (filtro === "week") {
+      const inicioSemana = new Date(agora);
+      inicioSemana.setDate(agora.getDate() - agora.getDay());
+      inicioSemana.setHours(0, 0, 0, 0);
+      return ocorrencias.filter((o) => o.timestamp >= inicioSemana.getTime());
+    } else if (filtro === "month") {
+      const inicioMes = new Date(
+        agora.getFullYear(),
+        agora.getMonth(),
+        1
+      ).getTime();
+      return ocorrencias.filter((o) => o.timestamp >= inicioMes);
+    }
+
+    return ocorrencias;
+  }
+
+  /**
+   * Aplica filtro de busca às ocorrências
+   * @param {Array} ocorrencias - Lista de ocorrências
+   * @param {string} termo - Termo de busca
+   * @returns {Array} Ocorrências filtradas
+   */
+  function aplicarFiltroBusca(ocorrencias, termo) {
+    if (!termo) {
+      return ocorrencias;
+    }
+
+    return ocorrencias.filter(
+      (o) =>
+        o.occurrenceNumber.toLowerCase().includes(termo) ||
+        o.nome.toLowerCase().includes(termo) ||
+        o.cpf.includes(termo)
+    );
+  }
+
+  /**
+   * Renderiza as ocorrências em um container
+   * @param {string} containerId - ID do container
+   * @param {Array} ocorrencias - Lista de ocorrências
+   */
+  function renderizarOcorrencias(containerId, ocorrencias) {
     const container = document.getElementById(containerId);
 
     if (!container) return;
 
-    // Clear container
+    // Limpar o container
     container.innerHTML = "";
 
     if (ocorrencias.length === 0) {
-      container.innerHTML =
-        '<div class="no-data">Nenhuma ocorrência encontrada.</div>';
+      mostrarVazio(
+        container,
+        "Nenhuma ocorrência encontrada com os filtros aplicados."
+      );
       return;
     }
 
-    // Create card for each occurrence
+    // Criar card para cada ocorrência
     ocorrencias.forEach((ocorrencia) => {
-      const card = createOcorrenciaCard(ocorrencia);
+      const card = criarCardOcorrencia(ocorrencia);
       container.appendChild(card);
     });
   }
 
-  // Create a card element for an occurrence
-  function createOcorrenciaCard(ocorrencia) {
+  /**
+   * Cria um card para uma ocorrência
+   * @param {Object} ocorrencia - Dados da ocorrência
+   * @returns {HTMLElement} Elemento HTML do card
+   */
+  function criarCardOcorrencia(ocorrencia) {
     const card = document.createElement("div");
-    card.className = `admin-card status-${ocorrencia.status.replace(" ", "-")}`;
+    card.className = `admin-card status-${ocorrencia.status
+      .replace(" ", "-")
+      .toLowerCase()}`;
     card.setAttribute("data-id", ocorrencia.occurrenceNumber);
 
-    const dataOcorrencia = new Date(ocorrencia.timestamp).toLocaleDateString(
-      "pt-BR"
-    );
-    const horaOcorrencia = new Date(ocorrencia.timestamp).toLocaleTimeString(
-      "pt-BR"
-    );
+    const dataOcorrencia = formatarData(ocorrencia.timestamp, true);
 
     card.innerHTML = `
-        <div class="card-header">
-          <div class="card-number">${ocorrencia.occurrenceNumber}</div>
-          <div class="card-status ${ocorrencia.status.replace(" ", "-")}">${
-      ocorrencia.status
-    }</div>
+      <div class="card-status-indicator"></div>
+      <div class="card-header">
+        <div class="ocorrencia-number">${ocorrencia.occurrenceNumber}</div>
+        <div class="ocorrencia-status ${ocorrencia.status
+          .replace(" ", "-")
+          .toLowerCase()}">${ocorrencia.status}</div>
+      </div>
+      <div class="card-body">
+        <div class="ocorrencia-info">
+          <div class="info-row">
+            <i class="fas fa-user"></i>
+            <span class="info-label">Nome:</span>
+            <span class="info-value">${ocorrencia.nome}</span>
+          </div>
+          <div class="info-row">
+            <i class="fas fa-id-card"></i>
+            <span class="info-label">CPF:</span>
+            <span class="info-value">${formatarCPF(ocorrencia.cpf)}</span>
+          </div>
+          <div class="info-row">
+            <i class="fas fa-calendar"></i>
+            <span class="info-label">Data:</span>
+            <span class="info-value">${dataOcorrencia}</span>
+          </div>
+          <div class="info-row">
+            <i class="fas fa-map-marker-alt"></i>
+            <span class="info-label">Local:</span>
+            <span class="info-value">${truncarTexto(
+              ocorrencia.enderecoOcorrencia,
+              40
+            )}</span>
+          </div>
+          ${
+            ocorrencia.certidao
+              ? `
+          <div class="info-row certidao-row">
+            <i class="fas fa-file-pdf"></i>
+            <span class="info-label">Certidão:</span>
+            <a href="${ocorrencia.certidao.url}" target="_blank" class="visualizar-link">
+              Visualizar <i class="fas fa-external-link-alt"></i>
+            </a>
+          </div>
+          `
+              : ""
+          }
         </div>
-        <div class="card-body">
-          <div class="card-info"><span>Nome:</span> ${ocorrencia.nome}</div>
-          <div class="card-info"><span>CPF:</span> ${ocorrencia.cpf}</div>
-          <div class="card-info"><span>Data:</span> ${dataOcorrencia} ${horaOcorrencia}</div>
-          <div class="card-info"><span>Local:</span> ${
-            ocorrencia.enderecoOcorrencia
-          }</div>
-        </div>
-        <div class="card-actions">
-          <button class="view-btn" data-id="${
-            ocorrencia.occurrenceNumber
-          }">Ver Detalhes</button>
-        </div>
-      `;
+      </div>
+      <div class="card-footer">
+        <button class="view-btn" data-id="${ocorrencia.occurrenceNumber}">
+          <i class="fas fa-eye"></i> Ver Detalhes
+        </button>
+      </div>
+    `;
 
-    // Add click event to view details button
+    // Adicionar evento de clique ao botão de detalhes
     const viewBtn = card.querySelector(".view-btn");
-    viewBtn.addEventListener("click", () => {
-      viewOcorrenciaDetails(ocorrencia.occurrenceNumber);
-    });
+    if (viewBtn) {
+      viewBtn.addEventListener("click", () => {
+        viewOcorrenciaDetails(ocorrencia.occurrenceNumber);
+      });
+    }
 
     return card;
   }
 
-  // Function to upload certidão
-  async function uploadCertidao(occurrenceNumber, certidaoFile) {
+  /**
+   * Exibe os detalhes de uma ocorrência no modal
+   * @param {string} occurrenceNumber - Número da ocorrência
+   */
+  async function viewOcorrenciaDetails(occurrenceNumber) {
     try {
-      // Referência para o storage no Firebase
-      const storageRef = firebase
-        .storage()
-        .ref(`ocorrencias/${occurrenceNumber}/certidao/${certidaoFile.name}`);
+      // Abrir modal com loading
+      detailModal.style.display = "flex";
+      modalTitle.textContent = `Detalhes da Ocorrência: ${occurrenceNumber}`;
+      mostrarLoading(modalBody, "Carregando detalhes...");
 
-      // Upload do arquivo
-      await storageRef.put(certidaoFile);
+      // Definir ocorrência atual
+      currentOccurrence = occurrenceNumber;
 
-      // Obter a URL de download
-      const downloadURL = await storageRef.getDownloadURL();
+      // Carregar dados da ocorrência
+      const ocorrencia = await carregarOcorrencia(occurrenceNumber);
 
-      // Retornar os dados do arquivo
-      return {
-        nome: certidaoFile.name,
-        url: downloadURL,
-        dataUpload: Date.now(),
-      };
-    } catch (error) {
-      console.error("Erro ao fazer upload da certidão:", error);
-      throw error;
-    }
-  }
-
-  // Função para enviar e-mail usando Firebase Functions
-  async function enviarEmailCertidao(
-    email,
-    nome,
-    occurrenceNumber,
-    certidaoURL
-  ) {
-    try {
-      // Exemplo de integração com Firebase Functions
-      const enviarEmailFunction = firebase
-        .functions()
-        .httpsCallable("enviarEmailCertidao");
-      await enviarEmailFunction({
-        destinatario: email,
-        nome: nome,
-        numeroOcorrencia: occurrenceNumber,
-        certidaoURL: certidaoURL,
-      });
-
-      console.log("E-mail enviado com sucesso para:", email);
-      return true;
-    } catch (error) {
-      console.error("Erro ao enviar e-mail:", error);
-      throw error;
-    }
-  }
-
-  // Função para enviar e-mail manualmente
-  async function enviarEmailManualmente(occurrenceNumber) {
-    try {
-      // Mostrar feedback de carregamento
-      const sendEmailBtn = document.querySelector(".send-email-btn");
-      if (sendEmailBtn) {
-        sendEmailBtn.textContent = "Enviando...";
-        sendEmailBtn.disabled = true;
+      // Atualizar select de status
+      if (statusSelect) {
+        statusSelect.value = ocorrencia.status;
       }
 
-      // Obter os dados da ocorrência
-      const ocorrenciaSnapshot = await database
-        .ref("ocorrencias/" + occurrenceNumber)
-        .once("value");
-      const ocorrencia = ocorrenciaSnapshot.val();
+      // Verificar se a certidão já foi anexada
+      let certidaoSection = "";
+      if (ocorrencia.certidao && ocorrencia.certidao.url) {
+        // Se já existe certidão, mostrar os detalhes
+        certidaoSection = `
+          <div class="modal-section">
+            <div class="section-title">Certidão Anexada</div>
+            <div class="certidao-info">
+              <p><strong>Nome do arquivo:</strong> ${
+                ocorrencia.certidao.nome
+              }</p>
+              <p><strong>Data de upload:</strong> ${formatarData(
+                ocorrencia.certidao.dataUpload,
+                true
+              )}</p>
+              <p><a href="${
+                ocorrencia.certidao.url
+              }" target="_blank" class="download-btn">Visualizar/Baixar Certidão</a></p>
+            </div>
+          </div>
+        `;
 
-      if (!ocorrencia || !ocorrencia.certidao || !ocorrencia.certidao.url) {
-        alert("Não é possível enviar o e-mail porque não há certidão anexada.");
-        if (sendEmailBtn) {
-          sendEmailBtn.textContent = "Reenviar E-mail";
-          sendEmailBtn.disabled = false;
-        }
-        return;
-      }
-
-      // Chamar a função do Firebase Functions para enviar o e-mail
-      const enviarEmailFunction = firebase
-        .functions()
-        .httpsCallable("enviarEmailCertidao");
-      await enviarEmailFunction({
-        destinatario: ocorrencia.email,
-        nome: ocorrencia.nome,
-        numeroOcorrencia: occurrenceNumber,
-        certidaoURL: ocorrencia.certidao.url,
-      });
-
-      // Atualizar a interface
-      alert("E-mail enviado com sucesso para " + ocorrencia.email);
-
-      // Recarregar os detalhes para atualizar a seção de e-mail
-      viewOcorrenciaDetails(occurrenceNumber);
-    } catch (error) {
-      console.error("Erro ao enviar e-mail manualmente:", error);
-      alert("Erro ao enviar e-mail: " + error.message);
-
-      // Restaurar o botão
-      const sendEmailBtn = document.querySelector(".send-email-btn");
-      if (sendEmailBtn) {
-        sendEmailBtn.textContent = "Reenviar E-mail";
-        sendEmailBtn.disabled = false;
-      }
-    }
-  }
-
-  // Adicione ao escopo global para que possa ser chamado pelos botões
-  window.enviarEmailManualmente = enviarEmailManualmente;
-
-  // View occurrence details
-  function viewOcorrenciaDetails(occurrenceNumber) {
-    // Get occurrence data from Firebase
-    database
-      .ref("ocorrencias/" + occurrenceNumber)
-      .once("value")
-      .then((snapshot) => {
-        if (snapshot.exists()) {
-          const ocorrencia = snapshot.val();
-          currentOccurrence = occurrenceNumber;
-
-          // Update modal title
-          modalTitle.textContent = `Detalhes da Ocorrência: ${occurrenceNumber}`;
-
-          // Update status select value
-          statusSelect.value = ocorrencia.status;
-
-          // Format dates
-          const dataOcorrencia = new Date(
-            ocorrencia.dataOcorrencia
-          ).toLocaleDateString("pt-BR");
-          const dataNascimento = new Date(
-            ocorrencia.dataNascimento
-          ).toLocaleDateString("pt-BR");
-          const dataTimestamp = new Date(ocorrencia.timestamp).toLocaleString(
-            "pt-BR"
+        // Se já existe certidão e o status é "Concluído", ocultar o campo de upload
+        if (ocorrencia.status === "Concluído") {
+          const uploadContainer = document.getElementById(
+            "certidao-upload-container"
           );
-
-          // Verificar se a certidão já foi anexada
-          let certidaoSection = "";
-          if (ocorrencia.certidao && ocorrencia.certidao.url) {
-            // Se já existe certidão, mostrar os detalhes
-            certidaoSection = `
-              <div class="modal-section">
-                <div class="section-title">Certidão Anexada</div>
-                <div class="certidao-info">
-                  <p><strong>Nome do arquivo:</strong> ${
-                    ocorrencia.certidao.nome
-                  }</p>
-                  <p><strong>Data de upload:</strong> ${new Date(
-                    ocorrencia.certidao.dataUpload
-                  ).toLocaleString("pt-BR")}</p>
-                  <p><a href="${
-                    ocorrencia.certidao.url
-                  }" target="_blank" class="download-btn">Visualizar/Baixar Certidão</a></p>
-                </div>
-              </div>
-            `;
-
-            // Se já existe certidão e o status é "Concluído", ocultar o campo de upload
-            if (ocorrencia.status === "Concluído") {
-              document.getElementById(
-                "certidao-upload-container"
-              ).style.display = "none";
-            } else {
-              document.getElementById(
-                "certidao-upload-container"
-              ).style.display = "block";
-            }
-          } else {
-            // Se não existe certidão, mostrar o campo de upload
-            document.getElementById("certidao-upload-container").style.display =
-              "block";
+          if (uploadContainer) {
+            uploadContainer.style.display = "none";
           }
-
-          // Verificar se o e-mail foi enviado
-          let emailSection = "";
-          if (ocorrencia.emailEnviado) {
-            const emailStatus = ocorrencia.emailEnviado.success
-              ? '<span class="status-badge concluído">Enviado com sucesso</span>'
-              : '<span class="status-badge cancelado">Falha no envio</span>';
-
-            const dataEnvio = new Date(
-              ocorrencia.emailEnviado.timestamp
-            ).toLocaleString("pt-BR");
-
-            // Botão de reenvio, só aparece se a certidão estiver anexada
-            const reenvioBtn =
-              ocorrencia.certidao && ocorrencia.certidao.url
-                ? `<button onclick="enviarEmailManualmente('${occurrenceNumber}')" class="send-email-btn">Reenviar E-mail</button>`
-                : "";
-
-            emailSection = `
-              <div class="modal-section">
-                <div class="section-title">Status do E-mail</div>
-                <div class="email-info">
-                  <p><strong>Status:</strong> ${emailStatus}</p>
-                  <p><strong>Data/Hora:</strong> ${dataEnvio}</p>
-                  ${
-                    ocorrencia.emailEnviado.error
-                      ? `<p><strong>Erro:</strong> ${ocorrencia.emailEnviado.error}</p>`
-                      : ""
-                  }
-                  ${reenvioBtn}
-                </div>
-              </div>
-            `;
-          } else if (ocorrencia.certidao && ocorrencia.certidao.url) {
-            // Se há certidão mas não há tentativa de envio de e-mail, mostrar botão para enviar
-            emailSection = `
-              <div class="modal-section">
-                <div class="section-title">Status do E-mail</div>
-                <div class="email-info">
-                  <p>Nenhum e-mail foi enviado ainda.</p>
-                  <button onclick="enviarEmailManualmente('${occurrenceNumber}')" class="send-email-btn">Enviar E-mail</button>
-                </div>
-              </div>
-            `;
-          }
-
-          // Build modal content
-          const content = `
-              <div class="modal-section">
-                <div class="section-title">Status Atual: <span class="card-status ${ocorrencia.status.replace(
-                  " ",
-                  "-"
-                )}">${ocorrencia.status}</span></div>
-                <p>Solicitação criada em: ${dataTimestamp}</p>
-              </div>
-              
-              ${certidaoSection}
-              ${emailSection}
-              
-              <div class="modal-section">
-                <div class="section-title">Informações do Solicitante</div>
-                <div class="info-grid">
-                  <div class="info-item">
-                    <label>Nome Completo:</label>
-                    <p>${ocorrencia.nome}</p>
-                  </div>
-                  <div class="info-item">
-                    <label>CPF:</label>
-                    <p>${ocorrencia.cpf}</p>
-                  </div>
-                  <div class="info-item">
-                    <label>RG:</label>
-                    <p>${ocorrencia.rg}</p>
-                  </div>
-                  <div class="info-item">
-                    <label>Data de Nascimento:</label>
-                    <p>${dataNascimento}</p>
-                  </div>
-                  <div class="info-item">
-                    <label>E-mail:</label>
-                    <p>${ocorrencia.email}</p>
-                  </div>
-                  <div class="info-item">
-                    <label>Telefone:</label>
-                    <p>${ocorrencia.telefone}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="modal-section">
-                <div class="section-title">Detalhes da Ocorrência</div>
-                <div class="info-grid">
-                  <div class="info-item">
-                    <label>Data da Ocorrência:</label>
-                    <p>${dataOcorrencia}</p>
-                  </div>
-                  <div class="info-item">
-                    <label>Endereço da Ocorrência:</label>
-                    <p>${ocorrencia.enderecoOcorrencia}</p>
-                  </div>
-                  <div class="info-item full-width">
-                    <label>Descrição:</label>
-                    <p>${ocorrencia.descricao}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="modal-section">
-                <div class="section-title">Documentos Anexados</div>
-                ${getDocumentosHTML(ocorrencia.documentos)}
-              </div>
-            `;
-
-          // Update modal body
-          modalBody.innerHTML = content;
-
-          // Show modal
-          detailModal.style.display = "flex";
         } else {
-          alert("Ocorrência não encontrada!");
+          const uploadContainer = document.getElementById(
+            "certidao-upload-container"
+          );
+          if (uploadContainer) {
+            uploadContainer.style.display = "block";
+          }
         }
-      })
-      .catch((error) => {
-        console.error("Error loading occurrence details:", error);
-        alert("Erro ao carregar detalhes da ocorrência.");
-      });
+      } else {
+        // Se não existe certidão, mostrar o campo de upload
+        const uploadContainer = document.getElementById(
+          "certidao-upload-container"
+        );
+        if (uploadContainer) {
+          uploadContainer.style.display = "block";
+        }
+      }
+
+      // Verificar se o e-mail foi enviado
+      let emailSection = "";
+      if (ocorrencia.emailEnviado) {
+        const emailStatus = ocorrencia.emailEnviado.success
+          ? '<span class="status-badge concluído">Enviado com sucesso</span>'
+          : '<span class="status-badge cancelado">Falha no envio</span>';
+
+        const dataEnvio = formatarData(ocorrencia.emailEnviado.timestamp, true);
+
+        // Botão de reenvio, só aparece se a certidão estiver anexada
+        const reenvioBtn =
+          ocorrencia.certidao && ocorrencia.certidao.url
+            ? `<button onclick="window.enviarEmailManualmente('${occurrenceNumber}')" class="send-email-btn">Reenviar E-mail</button>`
+            : "";
+
+        emailSection = `
+          <div class="modal-section">
+            <div class="section-title">Status do E-mail</div>
+            <div class="email-info">
+              <p><strong>Status:</strong> ${emailStatus}</p>
+              <p><strong>Data/Hora:</strong> ${dataEnvio}</p>
+              ${
+                ocorrencia.emailEnviado.error
+                  ? `<p><strong>Erro:</strong> ${ocorrencia.emailEnviado.error}</p>`
+                  : ""
+              }
+              ${reenvioBtn}
+            </div>
+          </div>
+        `;
+      } else if (ocorrencia.certidao && ocorrencia.certidao.url) {
+        // Se há certidão mas não há tentativa de envio de e-mail, mostrar botão para enviar
+        emailSection = `
+          <div class="modal-section">
+            <div class="section-title">Status do E-mail</div>
+            <div class="email-info">
+              <p>Nenhum e-mail foi enviado ainda.</p>
+              <button onclick="window.enviarEmailManualmente('${occurrenceNumber}')" class="send-email-btn">Enviar E-mail</button>
+            </div>
+          </div>
+        `;
+      }
+
+      // Formatar datas
+      const dataOcorrencia = formatarData(ocorrencia.dataOcorrencia);
+      const dataNascimento = formatarData(ocorrencia.dataNascimento);
+      const dataTimestamp = formatarData(ocorrencia.timestamp, true);
+
+      // Construir conteúdo do modal
+      const content = `
+        <div class="modal-section">
+          <div class="section-header">
+            <h3>Status Atual:</h3>
+            <span class="status-badge ${ocorrencia.status
+              .replace(" ", "-")
+              .toLowerCase()}">${ocorrencia.status}</span>
+          </div>
+          <p>Solicitação criada em: ${dataTimestamp}</p>
+          ${
+            ocorrencia.dataAtualizacao
+              ? `<p>Última atualização: ${formatarData(
+                  ocorrencia.dataAtualizacao,
+                  true
+                )}</p>`
+              : ""
+          }
+        </div>
+        
+        ${certidaoSection}
+        ${emailSection}
+        
+        <div class="modal-section">
+          <div class="section-title">Informações do Solicitante</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Nome Completo:</label>
+              <p>${ocorrencia.nome}</p>
+            </div>
+            <div class="info-item">
+              <label>CPF:</label>
+              <p>${formatarCPF(ocorrencia.cpf)}</p>
+            </div>
+            <div class="info-item">
+              <label>RG:</label>
+              <p>${ocorrencia.rg}</p>
+            </div>
+            <div class="info-item">
+              <label>Data de Nascimento:</label>
+              <p>${dataNascimento}</p>
+            </div>
+            <div class="info-item">
+              <label>E-mail:</label>
+              <p>${ocorrencia.email}</p>
+            </div>
+            <div class="info-item">
+              <label>Telefone:</label>
+              <p>${formatarTelefone(ocorrencia.telefone)}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-section">
+          <div class="section-title">Detalhes da Ocorrência</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Data da Ocorrência:</label>
+              <p>${dataOcorrencia}</p>
+            </div>
+            <div class="info-item">
+              <label>Endereço da Ocorrência:</label>
+              <p>${ocorrencia.enderecoOcorrencia}</p>
+            </div>
+            <div class="info-item full-width">
+              <label>Descrição:</label>
+              <p class="description-text">${ocorrencia.descricao}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-section">
+          <div class="section-title">Documentos Anexados</div>
+          ${getDocumentosHTML(ocorrencia.documentos)}
+        </div>
+      `;
+
+      // Atualizar corpo do modal
+      modalBody.innerHTML = content;
+    } catch (error) {
+      log(
+        `Erro ao carregar detalhes da ocorrência ${occurrenceNumber}: ${error.message}`,
+        "error",
+        error
+      );
+      mostrarErro(modalBody, `Erro ao carregar detalhes: ${error.message}`);
+    }
   }
 
-  // Format documents HTML
+  /**
+   * Formata HTML para exibição de documentos
+   * @param {Object} documentos - Objeto contendo os documentos
+   * @returns {string} HTML formatado
+   */
   function getDocumentosHTML(documentos) {
     if (!documentos) return "<p>Nenhum documento anexado.</p>";
 
@@ -713,46 +1144,46 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (documentos.documentoIdentidade) {
       html += `
-          <div class="documento-item">
-            <label>Documento de Identidade:</label>
-            <p><a href="${documentos.documentoIdentidade.url}" target="_blank">${documentos.documentoIdentidade.nome}</a></p>
-          </div>
-        `;
+        <div class="documento-item">
+          <label>Documento de Identidade:</label>
+          <p><a href="${documentos.documentoIdentidade.url}" target="_blank">${documentos.documentoIdentidade.nome}</a></p>
+        </div>
+      `;
     }
 
     if (documentos.comprovanteResidencia) {
       html += `
-          <div class="documento-item">
-            <label>Comprovante de Residência:</label>
-            <p><a href="${documentos.comprovanteResidencia.url}" target="_blank">${documentos.comprovanteResidencia.nome}</a></p>
-          </div>
-        `;
+        <div class="documento-item">
+          <label>Comprovante de Residência:</label>
+          <p><a href="${documentos.comprovanteResidencia.url}" target="_blank">${documentos.comprovanteResidencia.nome}</a></p>
+        </div>
+      `;
     }
 
     if (documentos.documentoCarro) {
       html += `
-          <div class="documento-item">
-            <label>Documento do Carro:</label>
-            <p><a href="${documentos.documentoCarro.url}" target="_blank">${documentos.documentoCarro.nome}</a></p>
-          </div>
-        `;
+        <div class="documento-item">
+          <label>Documento do Carro:</label>
+          <p><a href="${documentos.documentoCarro.url}" target="_blank">${documentos.documentoCarro.nome}</a></p>
+        </div>
+      `;
     }
 
     if (documentos.outrosDocumentos && documentos.outrosDocumentos.length > 0) {
       html += `
-          <div class="documento-item">
-            <label>Outros Documentos:</label>
-            <ul>
-        `;
+        <div class="documento-item">
+          <label>Outros Documentos:</label>
+          <ul class="other-docs-list">
+      `;
 
       documentos.outrosDocumentos.forEach((doc) => {
         html += `<li><a href="${doc.url}" target="_blank">${doc.nome}</a></li>`;
       });
 
       html += `
-            </ul>
-          </div>
-        `;
+          </ul>
+        </div>
+      `;
     }
 
     html += "</div>";
@@ -760,11 +1191,165 @@ document.addEventListener("DOMContentLoaded", function () {
     return html;
   }
 
-  // Update occurrence status
+  /**
+   * Carrega todos os dados do dashboard
+   */
+  async function loadDashboardData() {
+    try {
+      isLoading = true;
+
+      // Carregar ocorrências do Firebase
+      const ocorrencias = await carregarOcorrencias(true);
+
+      // Atualizar estatísticas
+      atualizarEstatisticas(ocorrencias);
+
+      // Carregar dados para a aba ativa
+      const activeTab = document.querySelector(".nav-item.active");
+      if (activeTab) {
+        carregarDadosAba(activeTab.getAttribute("data-tab"), ocorrencias);
+      }
+
+      // Verificar notificações
+      verificarNotificacoesLidas();
+
+      return ocorrencias;
+    } catch (error) {
+      log(
+        `Erro ao carregar dados do dashboard: ${error.message}`,
+        "error",
+        error
+      );
+      mostrarAlerta(
+        `Erro ao carregar dados. Por favor, recarregue a página. (${error.message})`,
+        "error"
+      );
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // ===== EVENT LISTENERS =====
+
+  // Tratamento de login
+  if (loginButton) {
+    loginButton.addEventListener("click", async function () {
+      try {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        // Validar entradas
+        if (!email || !password) {
+          loginError.textContent = "Por favor, preencha todos os campos.";
+          return;
+        }
+
+        // Tentar login
+        const user = await fazerLogin(email, password);
+
+        // Atualizar UI após login bem-sucedido
+        loginContainer.style.display = "none";
+        adminDashboard.style.display = "block";
+
+        // Exibir e-mail do usuário
+        if (userEmail) {
+          userEmail.textContent = user.email;
+        }
+
+        // Carregar dados do dashboard
+        loadDashboardData();
+      } catch (error) {
+        // Exibir erro
+        loginError.textContent = error.message;
+      }
+    });
+
+    // Permitir login com Enter
+    passwordInput.addEventListener("keyup", function (event) {
+      if (event.key === "Enter") {
+        loginButton.click();
+      }
+    });
+  }
+
+  // Tratamento de logout
+  if (logoutButton) {
+    logoutButton.addEventListener("click", async function () {
+      try {
+        await fazerLogout();
+
+        // Atualizar UI após logout
+        adminDashboard.style.display = "none";
+        loginContainer.style.display = "block";
+      } catch (error) {
+        mostrarAlerta(error.message, "error");
+      }
+    });
+  }
+
+  // Navegação entre abas
+  navItems.forEach((item) => {
+    item.addEventListener("click", function () {
+      // Remover classe active de todos os itens
+      navItems.forEach((nav) => nav.classList.remove("active"));
+
+      // Adicionar classe active ao item clicado
+      this.classList.add("active");
+
+      // Esconder todos os conteúdos de abas
+      tabContents.forEach((tab) => (tab.style.display = "none"));
+
+      // Mostrar conteúdo da aba selecionada
+      const tabId = this.getAttribute("data-tab") + "-tab";
+      const tabContent = document.getElementById(tabId);
+      if (tabContent) {
+        tabContent.style.display = "block";
+      }
+
+      // Carregar dados para a aba
+      carregarDadosAba(this.getAttribute("data-tab"));
+    });
+  });
+
+  // Busca
+  if (adminSearchBtn) {
+    adminSearchBtn.addEventListener("click", function () {
+      filtroBusca = adminSearch.value.trim().toLowerCase();
+
+      // Obter aba ativa
+      const activeTab = document.querySelector(".nav-item.active");
+      if (activeTab) {
+        carregarDadosAba(activeTab.getAttribute("data-tab"));
+      }
+    });
+
+    // Permitir busca com Enter
+    adminSearch.addEventListener("keyup", function (event) {
+      if (event.key === "Enter") {
+        adminSearchBtn.click();
+      }
+    });
+  }
+
+  // Filtro de data
+  if (dateFilter) {
+    dateFilter.addEventListener("change", function () {
+      filtroData = this.value;
+
+      // Obter aba ativa
+      const activeTab = document.querySelector(".nav-item.active");
+      if (activeTab) {
+        carregarDadosAba(activeTab.getAttribute("data-tab"));
+      }
+    });
+  }
+
+  // Atualização de status
   if (updateStatusBtn) {
     updateStatusBtn.addEventListener("click", async function () {
       if (!currentOccurrence) return;
 
+      // Obter novo status
       const newStatus = statusSelect.value;
 
       // Mostrar estado de carregamento
@@ -781,51 +1366,83 @@ document.addEventListener("DOMContentLoaded", function () {
             !certidaoFileInput.files ||
             certidaoFileInput.files.length === 0
           ) {
-            alert(
-              "Por favor, anexe a certidão antes de concluir a solicitação."
+            // Verificar se já existe uma certidão anexada
+            const ocorrencia = await carregarOcorrencia(currentOccurrence);
+
+            if (!ocorrencia.certidao || !ocorrencia.certidao.url) {
+              mostrarAlerta(
+                "Por favor, anexe a certidão antes de concluir a solicitação.",
+                "error"
+              );
+              throw new Error("Certidão não anexada");
+            }
+          } else {
+            // Fazer upload da certidão
+            const certidaoFile = certidaoFileInput.files[0];
+
+            // Validar arquivo
+            if (!validarArquivoCertidao(certidaoFile)) {
+              throw new Error("Arquivo inválido");
+            }
+
+            log("Iniciando upload de certidão", "info", {
+              nome: certidaoFile.name,
+              tamanho: certidaoFile.size,
+              tipo: certidaoFile.type,
+            });
+
+            const certidaoData = await uploadCertidao(
+              currentOccurrence,
+              certidaoFile
             );
-            updateStatusBtn.textContent = "Atualizar";
-            updateStatusBtn.disabled = false;
-            return;
+
+            // Verificar resultado do upload
+            if (!certidaoData || !certidaoData.url) {
+              throw new Error("Falha ao fazer upload da certidão");
+            }
+
+            // Atualizar o status e incluir os dados da certidão
+            await firebase
+              .database()
+              .ref(`ocorrencias/${currentOccurrence}`)
+              .update({
+                status: newStatus,
+                certidao: certidaoData,
+                dataAtualizacao: Date.now(),
+              });
+
+            // Obter dados do solicitante para enviar e-mail
+            const ocorrencia = await carregarOcorrencia(currentOccurrence);
+
+            // Enviar e-mail com a certidão
+            try {
+              await enviarEmailCertidao(
+                ocorrencia.email,
+                ocorrencia.nome,
+                currentOccurrence,
+                certidaoData.url
+              );
+
+              mostrarAlerta(
+                "Status atualizado e e-mail enviado com sucesso!",
+                "success"
+              );
+            } catch (emailError) {
+              log(
+                "Erro ao enviar e-mail, mas status foi atualizado",
+                "error",
+                emailError
+              );
+              mostrarAlerta(
+                `Status atualizado, mas ocorreu um erro ao enviar o e-mail: ${emailError.message}`,
+                "warning"
+              );
+            }
           }
-
-          // Fazer upload da certidão
-          const certidaoFile = certidaoFileInput.files[0];
-          const certidaoData = await uploadCertidao(
-            currentOccurrence,
-            certidaoFile
-          );
-
-          // Obter os dados da ocorrência para acessar o e-mail do solicitante
-          const ocorrenciaSnapshot = await database
-            .ref("ocorrencias/" + currentOccurrence)
-            .once("value");
-          const ocorrenciaData = ocorrenciaSnapshot.val();
-
-          // Atualizar o status e incluir os dados da certidão
-          await database.ref("ocorrencias/" + currentOccurrence).update({
-            status: newStatus,
-            certidao: certidaoData,
-            dataAtualizacao: Date.now(),
-          });
-
-          // Enviar e-mail com a certidão para o solicitante
-          await enviarEmailCertidao(
-            ocorrenciaData.email,
-            ocorrenciaData.nome,
-            currentOccurrence,
-            certidaoData.url
-          );
-
-          alert("Status atualizado e e-mail enviado com sucesso!");
         } else {
           // Se não for "Concluído", apenas atualizar o status
-          await database.ref("ocorrencias/" + currentOccurrence).update({
-            status: newStatus,
-            dataAtualizacao: Date.now(),
-          });
-
-          alert("Status atualizado com sucesso!");
+          await atualizarStatusOcorrencia(currentOccurrence, newStatus);
+          mostrarAlerta("Status atualizado com sucesso!", "success");
         }
 
         // Fechar modal
@@ -834,8 +1451,8 @@ document.addEventListener("DOMContentLoaded", function () {
         // Recarregar dados do dashboard
         loadDashboardData();
       } catch (error) {
-        console.error("Erro ao atualizar status:", error);
-        alert("Erro ao atualizar status: " + error.message);
+        log("Erro ao atualizar status:", "error", error);
+        mostrarAlerta(`Erro ao atualizar status: ${error.message}`, "error");
       } finally {
         // Restaurar estado do botão
         updateStatusBtn.textContent = "Atualizar";
@@ -844,7 +1461,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Modal close handlers
+  // Modal de detalhes - Fechar
   if (modalCloseBtn) {
     modalCloseBtn.addEventListener("click", function () {
       detailModal.style.display = "none";
@@ -857,119 +1474,78 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Close modal when clicking outside
+  // Fechar modal ao clicar fora
   window.addEventListener("click", function (event) {
     if (event.target === detailModal) {
       detailModal.style.display = "none";
     }
   });
 
-  // Search functionality
-  if (adminSearchBtn) {
-    adminSearchBtn.addEventListener("click", function () {
-      const searchTerm = adminSearch.value.trim().toLowerCase();
-
-      if (!searchTerm) {
-        loadDashboardData();
-        return;
-      }
-
-      // Get all occurrences and filter by search term
-      database
-        .ref("ocorrencias")
-        .once("value")
-        .then((snapshot) => {
-          if (!snapshot.exists()) return [];
-
-          const ocorrencias = [];
-          snapshot.forEach((childSnapshot) => {
-            ocorrencias.push({
-              id: childSnapshot.key,
-              ...childSnapshot.val(),
-            });
-          });
-
-          // Filter by search term (number, name, or CPF)
-          const filteredOcorrencias = ocorrencias.filter(
-            (o) =>
-              o.occurrenceNumber.toLowerCase().includes(searchTerm) ||
-              o.nome.toLowerCase().includes(searchTerm) ||
-              o.cpf.includes(searchTerm)
-          );
-
-          // Update stats with filtered data
-          updateStats(ocorrencias);
-
-          // Show results in the active tab
-          const activeTab = document
-            .querySelector(".nav-item.active")
-            .getAttribute("data-tab");
-
-          // Override loadTabData to use the filtered results
-          loadTabData(activeTab, filteredOcorrencias);
-        })
-        .catch((error) => {
-          console.error("Error searching occurrences:", error);
-          alert("Erro ao buscar ocorrências. Por favor, tente novamente.");
-        });
-    });
-  }
-
-  // Date filter change handler
-  if (dateFilter) {
-    dateFilter.addEventListener("change", function () {
-      const activeTab = document
-        .querySelector(".nav-item.active")
-        .getAttribute("data-tab");
-      loadTabData(activeTab);
-    });
-  }
-
-  // Handler para quando o status for alterado no select
+  // Select de status - Mostrar/ocultar campo de upload
   if (statusSelect) {
     statusSelect.addEventListener("change", function () {
-      const newStatus = statusSelect.value;
+      const newStatus = this.value;
       const certidaoUploadContainer = document.getElementById(
         "certidao-upload-container"
       );
 
-      // Se o novo status for "Concluído", mostrar o campo de upload da certidão
-      if (newStatus === "Concluído") {
-        certidaoUploadContainer.style.display = "block";
+      if (certidaoUploadContainer) {
+        // Se o novo status for "Concluído", mostrar o campo de upload
+        if (newStatus === "Concluído") {
+          certidaoUploadContainer.style.display = "block";
 
-        // Verificar se já existe certidão
-        database
-          .ref("ocorrencias/" + currentOccurrence + "/certidao")
-          .once("value")
-          .then((snapshot) => {
-            if (snapshot.exists()) {
-              const certificado = snapshot.val();
-              alert(
-                `Já existe uma certidão anexada (${certificado.nome}). Você pode manter a atual ou fazer upload de uma nova.`
-              );
-            }
-          });
-      } else {
-        // Se não for "Concluído", não é necessário mostrar o campo de upload
-        certidaoUploadContainer.style.display = "none";
+          // Verificar se já existe certidão
+          firebase
+            .database()
+            .ref(`ocorrencias/${currentOccurrence}/certidao`)
+            .once("value")
+            .then((snapshot) => {
+              if (snapshot.exists()) {
+                const certidao = snapshot.val();
+                mostrarAlerta(
+                  `Já existe uma certidão anexada (${certidao.nome}). Você pode manter a atual ou fazer upload de uma nova.`,
+                  "info"
+                );
+              }
+            });
+        } else {
+          // Se não for "Concluído", não é necessário mostrar o campo de upload
+          certidaoUploadContainer.style.display = "none";
+        }
       }
     });
   }
 
-  // Adicionar listener para visualizar arquivo de certidão antes do upload
-  const certidaoFileInput = document.getElementById("certidao-file");
+  // Visualizar arquivo de certidão antes do upload
   if (certidaoFileInput) {
     certidaoFileInput.addEventListener("change", function () {
       if (this.files && this.files.length > 0) {
-        const fileName = this.files[0].name;
-        const fileSize = (this.files[0].size / 1024 / 1024).toFixed(2); // em MB
+        const file = this.files[0];
+
+        // Validar arquivo
+        if (!validarArquivoCertidao(file)) {
+          // Limpar seleção
+          this.value = "";
+
+          // Remover informações de arquivo se existirem
+          const existingInfo = document.querySelector(".file-info");
+          if (existingInfo) {
+            existingInfo.remove();
+          }
+
+          return;
+        }
+
+        // Formatar tamanho
+        const fileSize = (file.size / 1024 / 1024).toFixed(2); // em MB
 
         // Mostrar informações do arquivo
         const fileInfoContainer = document.createElement("div");
         fileInfoContainer.className = "file-info";
         fileInfoContainer.innerHTML = `
-          <p><strong>Arquivo selecionado:</strong> ${fileName}</p>
+          <p><strong>Arquivo selecionado:</strong> ${file.name}</p>
           <p><strong>Tamanho:</strong> ${fileSize} MB</p>
+          <p><strong>Tipo:</strong> ${file.type}</p>
         `;
 
         // Remover informações anteriores se existirem
@@ -984,185 +1560,552 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Verificar leitura de notificações
-  function verificarNotificacoesLidas() {
-    // Obter usuário atual
-    const user = firebase.auth().currentUser;
-    if (!user) return;
+  // Notificações - Abrir/fechar painel
+  const notificationIcon = document.querySelector(".notification-icon");
+  if (notificationIcon) {
+    notificationIcon.addEventListener("click", async function () {
+      if (notificationsContainer) {
+        // Alternar visibilidade
+        if (notificationsContainer.style.display === "block") {
+          notificationsContainer.style.display = "none";
+        } else {
+          notificationsContainer.style.display = "block";
 
-    // Referência para notificações
-    const notificacoesRef = database.ref("notificacoes");
-
-    // Obter todas as notificações não lidas para este usuário
-    notificacoesRef
-      .orderByChild("lida")
-      .equalTo(false)
-      .once("value")
-      .then((snapshot) => {
-        if (snapshot.exists()) {
-          let count = 0;
-
-          snapshot.forEach((childSnapshot) => {
-            const notificacao = childSnapshot.val();
-
-            // Verificar se a notificação é para todos ou para este usuário específico
-            if (
-              notificacao.destinatario === "todos" ||
-              notificacao.destinatario === user.email
-            ) {
-              count++;
-            }
-          });
-
-          // Atualizar contador na interface, se necessário
-          if (count > 0) {
-            // Aqui você pode adicionar um indicador visual de notificações não lidas
-            console.log(`Você tem ${count} notificações não lidas`);
-          }
+          // Carregar notificações
+          const notificacoes = await carregarNotificacoesNaoLidas();
+          renderizarNotificacoes(notificacoes);
         }
-      })
-      .catch((error) => {
-        console.error("Erro ao verificar notificações:", error);
-      });
+      }
+    });
   }
 
-  // Executar verificação de notificações após login bem-sucedido
+  // Fechar painel de notificações
+  if (closeNotifications) {
+    closeNotifications.addEventListener("click", function () {
+      if (notificationsContainer) {
+        notificationsContainer.style.display = "none";
+      }
+    });
+  }
+
+  // Verificar estado de autenticação ao carregar a página
   firebase.auth().onAuthStateChanged((user) => {
     if (user) {
-      verificarNotificacoesLidas();
+      // Usuário autenticado
+      if (loginContainer) loginContainer.style.display = "none";
+      if (adminDashboard) adminDashboard.style.display = "block";
+
+      // Exibir e-mail do usuário
+      if (userEmail) {
+        userEmail.textContent = user.email;
+      }
+
+      // Carregar dados do dashboard
+      loadDashboardData();
+    } else {
+      // Usuário não autenticado
+      if (loginContainer) loginContainer.style.display = "block";
+      if (adminDashboard) adminDashboard.style.display = "none";
     }
   });
 
-  // Verificar notificações a cada 5 minutos (opcional)
+  // Exportação de certidões - Disponibilizar globalmente
+  window.exportarCertidoesConcluidas = exportarCertidoesConcluidas;
+
+  // Envio manual de e-mail - Disponibilizar globalmente
+  window.enviarEmailManualmente = enviarEmailManualmente;
+
+  // Verificar notificações periodicamente
   setInterval(() => {
     const user = firebase.auth().currentUser;
     if (user) {
       verificarNotificacoesLidas();
     }
-  }, 5 * 60 * 1000);
+  }, 2 * 60 * 1000); // A cada 2 minutos
 
-  // Exportar certidões concluídas (opcional)
-  function exportarCertidoesConcluidas() {
-    // Obter todas as ocorrências concluídas com certidão
-    database
-      .ref("ocorrencias")
-      .orderByChild("status")
-      .equalTo("Concluído")
-      .once("value")
-      .then((snapshot) => {
-        if (!snapshot.exists()) {
-          alert("Não há certidões concluídas para exportar.");
-          return;
-        }
+  // Log de inicialização
+  console.log("Painel administrativo inicializado", "info");
+});
 
-        const certidoesConcluidas = [];
+// ===== FUNÇÕES DE GERENCIAMENTO DE DADOS =====
 
-        snapshot.forEach((childSnapshot) => {
-          const ocorrencia = childSnapshot.val();
-
-          if (ocorrencia.certidao && ocorrencia.certidao.url) {
-            certidoesConcluidas.push({
-              numero: ocorrencia.occurrenceNumber,
-              solicitante: ocorrencia.nome,
-              cpf: ocorrencia.cpf,
-              dataOcorrencia: new Date(
-                ocorrencia.dataOcorrencia
-              ).toLocaleDateString("pt-BR"),
-              dataConclusao: ocorrencia.dataAtualizacao
-                ? new Date(ocorrencia.dataAtualizacao).toLocaleDateString(
-                    "pt-BR"
-                  )
-                : "N/A",
-              urlCertidao: ocorrencia.certidao.url,
-            });
-          }
-        });
-
-        if (certidoesConcluidas.length === 0) {
-          alert(
-            "Não há certidões concluídas com arquivos anexados para exportar."
-          );
-          return;
-        }
-
-        // Criar CSV
-        let csvContent =
-          "Número,Solicitante,CPF,Data da Ocorrência,Data de Conclusão,URL da Certidão\n";
-
-        certidoesConcluidas.forEach((certidao) => {
-          csvContent += `${certidao.numero},${certidao.solicitante},${certidao.cpf},${certidao.dataOcorrencia},${certidao.dataConclusao},${certidao.urlCertidao}\n`;
-        });
-
-        // Criar blob e link de download
-        const blob = new Blob([csvContent], {
-          type: "text/csv;charset=utf-8;",
-        });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute(
-          "download",
-          `certidoes_concluidas_${new Date().toISOString().split("T")[0]}.csv`
-        );
-        link.style.visibility = "hidden";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      })
-      .catch((error) => {
-        console.error("Erro ao exportar certidões:", error);
-        alert("Erro ao exportar certidões. Por favor, tente novamente.");
-      });
-  }
-
-  // Adicionar ao escopo global para uso em botões
-  window.exportarCertidoesConcluidas = exportarCertidoesConcluidas;
-
-  // Validação de arquivos antes do upload
-  function validarArquivoCertidao(file) {
-    // Verificar tipo de arquivo
-    const tiposPermitidos = [
-      "application/pdf",
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-    ];
-    if (!tiposPermitidos.includes(file.type)) {
-      alert("Tipo de arquivo não permitido. Por favor, use PDF, JPG ou PNG.");
-      return false;
+/**
+ * Carrega dados das ocorrências do Firebase
+ * @param {boolean} forcarAtualizacao - Se deve ignorar o cache
+ * @returns {Promise<Array>} Promise resolvida com array de ocorrências
+ */
+async function carregarOcorrencias(forcarAtualizacao = false) {
+  try {
+    // Verificar se podemos usar o cache
+    const agora = Date.now();
+    if (
+      !forcarAtualizacao &&
+      ocorrenciasCache &&
+      agora - ultimaAtualizacaoCache < TEMPO_EXPIRACAO_CACHE
+    ) {
+      log("Usando dados em cache");
+      return ocorrenciasCache;
     }
 
-    // Verificar tamanho (máximo 10MB)
-    const tamanhoMaximo = 10 * 1024 * 1024; // 10MB em bytes
-    if (file.size > tamanhoMaximo) {
-      alert(
-        `O arquivo é muito grande (${(file.size / 1024 / 1024).toFixed(
-          2
-        )}MB). O tamanho máximo permitido é 10MB.`
+    log("Buscando ocorrências do Firebase");
+    const snapshot = await firebase.database().ref("ocorrencias").once("value");
+
+    if (!snapshot.exists()) {
+      log("Nenhuma ocorrência encontrada");
+      return [];
+    }
+
+    const ocorrencias = [];
+
+    snapshot.forEach((childSnapshot) => {
+      ocorrencias.push({
+        id: childSnapshot.key,
+        ...childSnapshot.val(),
+      });
+    });
+
+    log(`${ocorrencias.length} ocorrências carregadas`);
+
+    // Atualizar cache
+    ocorrenciasCache = ocorrencias;
+    ultimaAtualizacaoCache = agora;
+
+    return ocorrencias;
+  } catch (error) {
+    log(`Erro ao carregar ocorrências: ${error.message}`, "error", error);
+    throw new Error("Erro ao carregar dados. Por favor, recarregue a página.");
+  }
+}
+
+/**
+ * Carrega dados de uma ocorrência específica
+ * @param {string} occurrenceNumber - Número da ocorrência
+ * @returns {Promise<Object>} Promise resolvida com dados da ocorrência
+ */
+async function carregarOcorrencia(occurrenceNumber) {
+  try {
+    log(`Carregando detalhes da ocorrência: ${occurrenceNumber}`);
+    const snapshot = await firebase
+      .database()
+      .ref(`ocorrencias/${occurrenceNumber}`)
+      .once("value");
+
+    if (!snapshot.exists()) {
+      throw new Error("Ocorrência não encontrada!");
+    }
+
+    return {
+      id: snapshot.key,
+      ...snapshot.val(),
+    };
+  } catch (error) {
+    log(
+      `Erro ao carregar ocorrência ${occurrenceNumber}: ${error.message}`,
+      "error",
+      error
+    );
+    throw new Error(
+      `Erro ao carregar detalhes da ocorrência: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Atualiza o status de uma ocorrência
+ * @param {string} occurrenceNumber - Número da ocorrência
+ * @param {string} newStatus - Novo status
+ * @returns {Promise} Promise resolvida após atualização
+ */
+async function atualizarStatusOcorrencia(occurrenceNumber, newStatus) {
+  try {
+    log(
+      `Atualizando status da ocorrência ${occurrenceNumber} para ${newStatus}`
+    );
+
+    await firebase.database().ref(`ocorrencias/${occurrenceNumber}`).update({
+      status: newStatus,
+      dataAtualizacao: Date.now(),
+    });
+
+    log("Status atualizado com sucesso");
+
+    // Atualizar cache se existir
+    if (ocorrenciasCache) {
+      const index = ocorrenciasCache.findIndex(
+        (o) => o.id === occurrenceNumber
       );
-      return false;
+      if (index !== -1) {
+        ocorrenciasCache[index].status = newStatus;
+        ocorrenciasCache[index].dataAtualizacao = Date.now();
+      }
     }
 
     return true;
+  } catch (error) {
+    log(`Erro ao atualizar status: ${error.message}`, "error", error);
+    throw new Error(`Erro ao atualizar status: ${error.message}`);
   }
+}
 
-  // Se o certidão-file existir, adicionar validação
-  if (certidaoFileInput) {
-    certidaoFileInput.addEventListener("change", function () {
-      if (this.files && this.files.length > 0) {
-        const file = this.files[0];
+/**
+ * Função melhorada para upload de certidão
+ * @param {string} occurrenceNumber - Número da ocorrência
+ * @param {File} certidaoFile - Arquivo de certidão
+ * @returns {Promise<Object>} Promise resolvida com dados do arquivo
+ */
+async function uploadCertidao(occurrenceNumber, certidaoFile) {
+  try {
+    // Exibir feedback visual do processo de upload
+    isUploading = true;
+    const updateStatusBtn = document.getElementById("update-status-btn");
+    if (updateStatusBtn) {
+      updateStatusBtn.textContent = "Enviando arquivo...";
+      updateStatusBtn.disabled = true;
+    }
 
-        if (!validarArquivoCertidao(file)) {
-          // Limpar seleção se for inválido
-          this.value = "";
+    log(
+      `Iniciando upload para ocorrência ${occurrenceNumber}: ${certidaoFile.name}`
+    );
 
-          // Remover informações de arquivo se existirem
-          const existingInfo = document.querySelector(".file-info");
-          if (existingInfo) {
-            existingInfo.remove();
-          }
+    // Garantir que o Firebase Storage esteja disponível
+    if (!firebase.storage) {
+      throw new Error("Firebase Storage não está disponível");
+    }
+
+    // Referência para o storage no Firebase com tratamento de espaços e caracteres especiais
+    const filename =
+      new Date().getTime() + "_" + certidaoFile.name.replace(/[^\w.-]/g, "_");
+    const storagePath = `ocorrencias/${occurrenceNumber}/certidao/${filename}`;
+    const storageRef = firebase.storage().ref(storagePath);
+
+    log(`Referência de armazenamento criada: ${storagePath}`);
+
+    // Criar um elemento para mostrar o progresso do upload
+    const progressContainer = document.createElement("div");
+    progressContainer.className = "upload-progress-container";
+    progressContainer.innerHTML = `
+        <div class="upload-progress-label">Enviando arquivo: <span>0%</span></div>
+        <div class="upload-progress-bar">
+          <div class="upload-progress-fill" style="width: 0%"></div>
+        </div>
+      `;
+
+    // Adicionar ao DOM na seção de upload
+    const uploadContainer = document.getElementById(
+      "certidao-upload-container"
+    );
+    if (uploadContainer) {
+      // Remover barra de progresso anterior se existir
+      const existingProgress = uploadContainer.querySelector(
+        ".upload-progress-container"
+      );
+      if (existingProgress) {
+        existingProgress.remove();
+      }
+
+      uploadContainer.appendChild(progressContainer);
+    }
+
+    // Upload do arquivo com monitoramento de progresso
+    const uploadTask = storageRef.put(certidaoFile);
+
+    // Monitorar progresso do upload
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const progress =
+          (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        const progressPercent = Math.round(progress);
+        log(`Progresso do upload: ${progressPercent}%`);
+
+        // Atualizar a UI com o progresso
+        const progressFill = progressContainer.querySelector(
+          ".upload-progress-fill"
+        );
+        const progressLabel = progressContainer.querySelector(
+          ".upload-progress-label span"
+        );
+
+        if (progressFill && progressLabel) {
+          progressFill.style.width = `${progressPercent}%`;
+          progressLabel.textContent = `${progressPercent}%`;
         }
+      },
+      (error) => {
+        log("Erro durante o upload:", "error", error);
+        throw error;
+      }
+    );
+
+    // Aguardar a conclusão do upload
+    await uploadTask;
+    log("Upload concluído com sucesso");
+
+    // Atualizar a UI após o upload completo
+    if (progressContainer) {
+      progressContainer.innerHTML = `
+          <div class="upload-complete">
+            <i class="fas fa-check-circle"></i>
+            Upload completo: ${certidaoFile.name}
+          </div>
+        `;
+    }
+
+    // Obter a URL de download
+    const downloadURL = await storageRef.getDownloadURL();
+    log("URL de download obtida:", "info", downloadURL);
+
+    // Retornar os dados do arquivo
+    return {
+      nome: certidaoFile.name,
+      url: downloadURL,
+      dataUpload: Date.now(),
+      tamanho: certidaoFile.size,
+      tipo: certidaoFile.type,
+    };
+  } catch (error) {
+    log("Erro detalhado ao fazer upload da certidão:", "error", error);
+
+    // Mostrar erro na UI
+    const uploadContainer = document.getElementById(
+      "certidao-upload-container"
+    );
+    if (uploadContainer) {
+      const progressContainer = uploadContainer.querySelector(
+        ".upload-progress-container"
+      );
+      if (progressContainer) {
+        progressContainer.innerHTML = `
+            <div class="upload-error">
+              <i class="fas fa-exclamation-circle"></i>
+              Erro no upload: ${error.message || "Falha ao enviar arquivo"}
+            </div>
+          `;
+      }
+    }
+
+    // Mostrar alerta com detalhes do erro
+    let mensagemErro = "Erro ao fazer upload da certidão. ";
+    if (error.code) {
+      // Erros específicos do Firebase
+      switch (error.code) {
+        case "storage/unauthorized":
+          mensagemErro += "Sem permissão para acessar o Storage.";
+          break;
+        case "storage/canceled":
+          mensagemErro += "Upload cancelado.";
+          break;
+        case "storage/unknown":
+          mensagemErro += "Erro desconhecido no Storage.";
+          break;
+        default:
+          mensagemErro +=
+            error.message || "Verifique o console para mais detalhes.";
+      }
+    } else {
+      mensagemErro +=
+        error.message || "Verifique o console para mais detalhes.";
+    }
+
+    mostrarAlerta(mensagemErro, "error");
+    throw error;
+  } finally {
+    isUploading = false;
+  }
+}
+
+/**
+ * Envia e-mail com certidão usando Firebase Functions
+ * @param {string} email - Email do destinatário
+ * @param {string} nome - Nome do destinatário
+ * @param {string} occurrenceNumber - Número da ocorrência
+ * @param {string} certidaoURL - URL da certidão
+ * @returns {Promise} Promise resolvida após envio
+ */
+async function enviarEmailCertidao(email, nome, occurrenceNumber, certidaoURL) {
+  try {
+    log(
+      `Enviando e-mail para ${email} referente à ocorrência ${occurrenceNumber}`
+    );
+
+    // Verificar se o módulo de functions está disponível
+    if (!firebase.functions) {
+      throw new Error("Firebase Functions não está disponível");
+    }
+
+    // Chamar a função do Firebase Functions
+    const enviarEmailFunction = firebase
+      .functions()
+      .httpsCallable("enviarEmailCertidao");
+    const resultado = await enviarEmailFunction({
+      destinatario: email,
+      nome: nome,
+      numeroOcorrencia: occurrenceNumber,
+      certidaoURL: certidaoURL,
+    });
+
+    log("Resultado do envio de e-mail:", "info", resultado.data);
+
+    if (!resultado.data.success) {
+      throw new Error(resultado.data.message || "Falha ao enviar e-mail");
+    }
+
+    return resultado.data;
+  } catch (error) {
+    log(`Erro ao enviar e-mail: ${error.message}`, "error", error);
+    throw new Error(`Erro ao enviar e-mail: ${error.message}`);
+  }
+}
+
+/**
+ * Envia e-mail manualmente
+ * @param {string} occurrenceNumber - Número da ocorrência
+ * @returns {Promise} Promise resolvida após envio
+ */
+async function enviarEmailManualmente(occurrenceNumber) {
+  try {
+    // Mostrar feedback de carregamento
+    const sendEmailBtn = document.querySelector(".send-email-btn");
+    if (sendEmailBtn) {
+      sendEmailBtn.textContent = "Enviando...";
+      sendEmailBtn.disabled = true;
+    }
+
+    // Obter os dados da ocorrência
+    const ocorrencia = await carregarOcorrencia(occurrenceNumber);
+
+    if (!ocorrencia || !ocorrencia.certidao || !ocorrencia.certidao.url) {
+      throw new Error(
+        "Não é possível enviar o e-mail porque não há certidão anexada."
+      );
+    }
+
+    // Chamar a função do Firebase Functions para enviar o e-mail
+    const resultado = await enviarEmailCertidao(
+      ocorrencia.email,
+      ocorrencia.nome,
+      occurrenceNumber,
+      ocorrencia.certidao.url
+    );
+
+    // Atualizar a interface
+    mostrarAlerta(
+      `E-mail enviado com sucesso para ${ocorrencia.email}`,
+      "success"
+    );
+
+    // Recarregar os detalhes para atualizar a seção de e-mail
+    viewOcorrenciaDetails(occurrenceNumber);
+
+    return resultado;
+  } catch (error) {
+    log("Erro ao enviar e-mail manualmente:", "error", error);
+    mostrarAlerta(`Erro ao enviar e-mail: ${error.message}`, "error");
+    throw error;
+  } finally {
+    // Restaurar o botão
+    const sendEmailBtn = document.querySelector(".send-email-btn");
+    if (sendEmailBtn) {
+      sendEmailBtn.textContent = "Reenviar E-mail";
+      sendEmailBtn.disabled = false;
+    }
+  }
+}
+
+/**
+ * Exporta certidões concluídas para CSV
+ * @returns {Promise} Promise resolvida após exportação
+ */
+async function exportarCertidoesConcluidas() {
+  try {
+    log("Iniciando exportação de certidões concluídas");
+
+    // Mostrar feedback de carregamento
+    const actionBtn = document.querySelector(".action-btn");
+    if (actionBtn) {
+      actionBtn.textContent = "Exportando...";
+      actionBtn.disabled = true;
+    }
+
+    // Obter todas as ocorrências concluídas com certidão
+    const snapshot = await firebase
+      .database()
+      .ref("ocorrencias")
+      .orderByChild("status")
+      .equalTo("Concluído")
+      .once("value");
+
+    if (!snapshot.exists()) {
+      throw new Error("Não há certidões concluídas para exportar.");
+    }
+
+    const certidoesConcluidas = [];
+
+    snapshot.forEach((childSnapshot) => {
+      const ocorrencia = childSnapshot.val();
+
+      if (ocorrencia.certidao && ocorrencia.certidao.url) {
+        certidoesConcluidas.push({
+          numero: ocorrencia.occurrenceNumber,
+          solicitante: ocorrencia.nome,
+          cpf: ocorrencia.cpf,
+          dataOcorrencia: formatarData(ocorrencia.dataOcorrencia),
+          dataConclusao: ocorrencia.dataAtualizacao
+            ? formatarData(ocorrencia.dataAtualizacao)
+            : "N/A",
+          urlCertidao: ocorrencia.certidao.url,
+        });
       }
     });
+
+    if (certidoesConcluidas.length === 0) {
+      throw new Error(
+        "Não há certidões concluídas com arquivos anexados para exportar."
+      );
+    }
+
+    log(`${certidoesConcluidas.length} certidões serão exportadas`);
+
+    // Criar CSV
+    let csvContent =
+      "Número;Solicitante;CPF;Data da Ocorrência;Data de Conclusão;URL da Certidão\n";
+
+    certidoesConcluidas.forEach((certidao) => {
+      // Usar ponto-e-vírgula como separador para melhor compatibilidade com Excel brasileiro
+      csvContent += `${certidao.numero};${certidao.solicitante};${certidao.cpf};${certidao.dataOcorrencia};${certidao.dataConclusao};${certidao.urlCertidao}\n`;
+    });
+
+    // Criar blob e link de download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `certidoes_concluidas_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    log("Exportação concluída com sucesso");
+    mostrarAlerta(
+      `${certidoesConcluidas.length} certidões exportadas com sucesso!`,
+      "success"
+    );
+
+    return true;
+  } catch (error) {
+    log(`Erro ao exportar certidões: ${error.message}`, "error", error);
+    mostrarAlerta(`Erro ao exportar certidões: ${error.message}`, "error");
+    throw error;
+  } finally {
+    // Restaurar o botão
+    const actionBtn = document.querySelector(".action-btn");
+    if (actionBtn) {
+      actionBtn.textContent = "Exportar Certidões";
+      actionBtn.disabled = false;
+    }
   }
-});
+}
