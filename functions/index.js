@@ -15,13 +15,13 @@ const transporter = nodemailer.createTransport({
 
 // Função para enviar e-mail chamável via HTTPS
 exports.enviarEmailCertidao = functions.https.onCall(async (data, context) => {
-  // Verificar se o usuário está autenticado
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "O usuário deve estar autenticado para enviar e-mails."
-    );
-  }
+  // Verificar se o usuário está autenticado (opcional para funções públicas)
+  // if (!context.auth) {
+  //   throw new functions.https.HttpsError(
+  //     "unauthenticated",
+  //     "O usuário deve estar autenticado para enviar e-mails."
+  //   );
+  // }
 
   const { destinatario, nome, numeroOcorrencia, certidaoURL } = data;
 
@@ -403,12 +403,12 @@ exports.gerarRelatorioMensal = functions.pubsub
 exports.enviarEmailConfirmacao = functions.https.onCall(
   async (data, context) => {
     // Verificar se o usuário está autenticado (opcional, pode ser removido se a função for chamada publicamente)
-    if (!context.auth && !data.publicRequest) {
-      throw new functions.https.HttpsError(
-        "unauthenticated",
-        "O usuário deve estar autenticado para enviar e-mails."
-      );
-    }
+    // if (!context.auth && !data.publicRequest) {
+    //   throw new functions.https.HttpsError(
+    //     "unauthenticated",
+    //     "O usuário deve estar autenticado para enviar e-mails."
+    //   );
+    // }
 
     const { destinatario, nome, numeroOcorrencia } = data;
 
@@ -422,8 +422,8 @@ exports.enviarEmailConfirmacao = functions.https.onCall(
     // Construir o conteúdo do e-mail
     const mailOptions = {
       from: '"Sistema de Certidões" <gocg.certidao@gmail.com>',
-      to: destinatario,
       subject: `Confirmação de Solicitação - Protocolo ${numeroOcorrencia}`,
+      to: destinatario,
       html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
         <h2 style="color: #3b82f6; text-align: center;">Solicitação Recebida com Sucesso</h2>
@@ -534,7 +534,7 @@ exports.enviarEmailNovaOcorrencia = functions.database
               <p>Caso tenha alguma dúvida, não deixe de perguntar.</p>
               
               <p>Atenciosamente,</p>
-              <p><strong>Grupamento Operacional do Comando Geral/strong></p>
+              <p><strong>Grupamento Operacional do Comando Geral</strong></p>
               
               <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
                 <p>Este é um e-mail automático. </p>
