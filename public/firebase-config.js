@@ -21,16 +21,8 @@ window.database = firebase.database();
 window.storage = firebase.storage();
 window.auth = firebase.auth();
 
-// Verificar se o módulo de functions está disponível e inicializá-lo
-if (typeof firebase.functions === "function") {
+// Verificar se o módulo de functions está disponível
+if (firebase.functions) {
   window.functions = firebase.functions();
-  if (window.firebaseConfig.functionsRegion) {
-    try {
-      window.functions = firebase
-        .functions()
-        .region(window.firebaseConfig.functionsRegion);
-    } catch (error) {
-      console.error("Erro ao definir região das funções:", error);
-    }
-  }
+  // Remover a chamada de .region() que estava causando o erro
 }
