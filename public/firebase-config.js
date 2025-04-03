@@ -24,12 +24,13 @@ window.auth = firebase.auth();
 // Verificar se o módulo de functions está disponível e inicializá-lo
 if (typeof firebase.functions === "function") {
   window.functions = firebase.functions();
-
-  // Definir região personalizada se especificada - REMOVER ESTA PARTE OU CORRIGIR
-  // A linha abaixo está causando erro - remova ou substitua por:
-  // if (window.firebaseConfig.functionsRegion) {
-  //   window.functions = firebase.functions().region(window.firebaseConfig.functionsRegion);
-  // }
+  if (window.firebaseConfig.functionsRegion) {
+    try {
+      window.functions = firebase
+        .functions()
+        .region(window.firebaseConfig.functionsRegion);
+    } catch (error) {
+      console.error("Erro ao definir região das funções:", error);
+    }
+  }
 }
-
-console.log("Firebase inicializado com sucesso");
