@@ -2,5 +2,9 @@
   "name": "sistema-certidoes",
   "version": 2,
   "public": true,
-  "rewrites": [{ "source": "/admin", "destination": "/admin.html" }]
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/admin/(.*)", "destination": "/admin.html" }
+  ],
+  "trailingSlash": false
 }
