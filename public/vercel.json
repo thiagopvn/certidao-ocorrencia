@@ -3,8 +3,8 @@
   "public": true,
   "cleanUrls": true,
   "trailingSlash": false,
-  "routes": [
-    { "src": "/admin", "dest": "/admin.html" },
-    { "src": "/admin/(.*)", "dest": "/admin.html" }
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/admin/(.*)", "destination": "/admin.html" }
   ]
 }
