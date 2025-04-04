@@ -1128,19 +1128,51 @@ document.addEventListener("DOMContentLoaded", function () {
     if (fileUploadArea) {
       const fileText = fileUploadArea.querySelector("p");
       const originalText = fileText.textContent;
-
-      input.addEventListener("change", function () {
-        if (this.files.length > 0) {
-          if (this.multiple && this.files.length > 1) {
-            fileText.textContent = `${this.files.length} arquivos selecionados`;
+      
+      // Criar botão de remoção
+      const clearButton = document.createElement("button");
+      clearButton.type = "button";
+      clearButton.className = "file-clear-btn";
+      clearButton.innerHTML = '<i class="fas fa-times"></i>';
+      clearButton.title = "Remover arquivo";
+      // Inicialmente oculto
+      clearButton.style.display = "none";
+      
+      // Adicionar o botão à área de upload
+      fileUploadArea.appendChild(clearButton);
+      
+      // Função para atualizar a UI quando arquivos forem selecionados/removidos
+      const updateFileUI = function() {
+        if (input.files.length > 0) {
+          if (input.multiple && input.files.length > 1) {
+            fileText.textContent = `${input.files.length} arquivos selecionados`;
           } else {
-            fileText.textContent = this.files[0].name;
+            fileText.textContent = input.files[0].name;
           }
           fileUploadArea.classList.add("file-selected");
+          clearButton.style.display = "block"; // Mostrar botão de remoção
         } else {
           fileText.textContent = originalText;
           fileUploadArea.classList.remove("file-selected");
+          clearButton.style.display = "none"; // Ocultar botão de remoção
         }
+      };
+
+      // Evento quando um arquivo é selecionado
+      input.addEventListener("change", updateFileUI);
+
+      // Evento para o botão de remoção
+      clearButton.addEventListener("click", function(e) {
+        e.stopPropagation(); // Evitar que o clique chegue à área de upload
+        
+        // Limpar o input de arquivo
+        input.value = "";
+        
+        // Atualizar a UI
+        updateFileUI();
+        
+        // Evitar que o evento de clique se propague
+        return false;
       });
 
       // Visual feedback ao arrastar arquivos
@@ -1168,6 +1200,62 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
   });
+
+  // Adicionar estilo para o botão de remoção de arquivos
+  const uploadButtonStyles = document.createElement("style");
+  uploadButtonStyles.textContent = `
+    .file-upload-area {
+      position: relative; /* Importante para posicionar o botão corretamente */
+    }
+
+    .file-clear-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: rgba(239, 68, 68, 0.15);
+      border: none;
+      color: var(--danger-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 20;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .file-clear-btn:hover {
+      background-color: var(--danger-color);
+      color: white;
+      opacity: 1;
+    }
+
+    /* Melhorias visuais quando um arquivo é selecionado */
+    .file-upload-area.file-selected {
+      border-color: var(--primary-color);
+      background-color: rgba(59, 130, 246, 0.05);
+      border-style: solid;
+    }
+
+    .file-upload-area.file-selected i {
+      color: var(--primary-color);
+    }
+
+    .file-upload-area.file-selected p {
+      color: var(--gray-700);
+      font-weight: 500;
+      max-width: calc(100% - 30px); /* Deixa espaço para o botão de remoção */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: inline-block;
+    }
+  `;
+  document.head.appendChild(uploadButtonStyles);
 
   // Adicionar estilo para exibir o status do e-mail de confirmação
   const emailStatusStyles = document.createElement("style");
