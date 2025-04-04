@@ -754,3 +754,40 @@ button#search-button:hover {
     flex: auto;
   }
 }
+
+/* Estilo para o botão de remover arquivo */
+.remove-file-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--danger-color);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  z-index: 15;
+}
+
+.remove-file-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Garantir que o container seja posicionado relativamente */
+.file-upload-area {
+  position: relative;
+}
+
+/* Ajustar o texto quando o botão de remover estiver visível */
+.file-selected p {
+  padding-right: 30px; /* Espaço para o botão de remover */
+  word-break: break-word; /* Quebrar palavras longas */
+  max-width: calc(100% - 40px); /* Evitar sobreposição com o botão */
+}
