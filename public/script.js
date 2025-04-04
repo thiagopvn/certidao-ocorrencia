@@ -8,6 +8,10 @@ document.addEventListener("DOMContentLoaded", function () {
   // Flag para controlar envios múltiplos
   let isSubmitting = false;
 
+  // Garantir que estamos usando a referência correta ao banco de dados
+  // Verifica se window.database existe, caso contrário, tenta window.db ou firebase.database()
+  const database = window.database || window.db || firebase.database();
+
   // Preencher a data de solicitação automaticamente com a data atual
   const hoje = new Date();
   const dataFormatada = hoje.toLocaleDateString("pt-BR");
@@ -60,6 +64,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // Função para enviar e-mail de confirmação usando Firebase Functions
   async function enviarEmailConfirmacao(dados) {
     try {
+      console.log("Tentando enviar e-mail de confirmação...");
+      
       // Certifique-se de que o firebase.functions() esteja inicializado
       if (typeof firebase.functions !== "function") {
         console.error("Firebase Functions não está disponível");
@@ -69,15 +75,13 @@ document.addEventListener("DOMContentLoaded", function () {
       // Nome da função do Firebase que envia o e-mail de confirmação
       const enviarEmailFunction = firebase
         .functions()
-        .httpsCallable("enviarEmailCertidao");
+        .httpsCallable("enviarEmailConfirmacao");
 
       // Preparar dados para envio
       const emailData = {
         destinatario: dados.email,
         nome: dados.nome,
-        numeroOcorrencia: dados.occurrenceNumber,
-        certidaoURL: "#", // Sem certidão ainda, será apenas notificação da solicitação
-        tipoEmail: "confirmacao", // Indica que é um e-mail de confirmação de solicitação
+        numeroOcorrencia: dados.occurrenceNumber
       };
 
       // Enviar a solicitação para a função do Firebase
@@ -218,26 +222,38 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Salvar dados no Firebase Realtime Database
         await database.ref("ocorrencias/" + occurrenceNumber).set(formData);
+        console.log("Dados da ocorrência salvos com sucesso!");
 
-        // Enviar e-mail de confirmação para o solicitante
-        const emailEnviado = await enviarEmailConfirmacao(formData);
-
-        // Registrar o status do envio do e-mail de confirmação
-        if (emailEnviado) {
-          await database
-            .ref(`ocorrencias/${occurrenceNumber}/emailConfirmacao`)
-            .set({
+        // Enviar e-mail de confirmação para o solicitante - com tratamento de erro aprimorado
+        try {
+          const emailEnviado = await enviarEmailConfirmacao(formData);
+          
+          // Registrar o status do envio do e-mail de confirmação
+          if (emailEnviado) {
+            await database.ref(`ocorrencias/${occurrenceNumber}/emailConfirmacao`).set({
               timestamp: Date.now(),
               success: true,
             });
-        } else {
-          await database
-            .ref(`ocorrencias/${occurrenceNumber}/emailConfirmacao`)
-            .set({
+          } else {
+            console.warn("E-mail não enviado, mas o processo continua.");
+            await database.ref(`ocorrencias/${occurrenceNumber}/emailConfirmacao`).set({
               timestamp: Date.now(),
               success: false,
               error: "Falha no envio do e-mail de confirmação",
             });
+          }
+        } catch (emailError) {
+          console.error("Erro ao enviar e-mail de confirmação:", emailError);
+          // Registrar falha no banco de dados, mas continuar o fluxo
+          try {
+            await database.ref(`ocorrencias/${occurrenceNumber}/emailConfirmacao`).set({
+              timestamp: Date.now(),
+              success: false,
+              error: "Falha no envio do e-mail de confirmação: " + (emailError.message || "erro desconhecido"),
+            });
+          } catch (dbError) {
+            console.error("Erro ao registrar falha de e-mail:", dbError);
+          }
         }
 
         // Exibir mensagem de sucesso com alerta mais amigável
@@ -276,6 +292,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Função para fazer upload de arquivos para o Firebase Storage
   async function uploadFilesToFirebase(occurrenceNumber) {
     const fileUrls = {};
+    const storage = window.storage || firebase.storage();
 
     // Função auxiliar para fazer upload de um arquivo
     const uploadFile = async (fileInput, fileType) => {
@@ -591,6 +608,7 @@ document.addEventListener("DOMContentLoaded", function () {
     ocorrenciasContainer.innerHTML =
       '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Buscando ocorrências...</p></div>';
 
+    // Usar a referência correta ao banco de dados
     let query = database.ref("ocorrencias");
 
     query
@@ -673,6 +691,7 @@ document.addEventListener("DOMContentLoaded", function () {
     ocorrenciasContainer.innerHTML =
       '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Buscando ocorrências...</p></div>';
 
+    // Usar a referência correta ao banco de dados
     let query = database.ref("ocorrencias");
 
     query

@@ -16,12 +16,9 @@ document.addEventListener("DOMContentLoaded", function () {
   if (uploadAreas.length) {
     uploadAreas.forEach((area) => {
       area.addEventListener("click", function (e) {
-        // Impedir clique no input se já clicou na área
-        e.preventDefault();
-
         // Encontrar o input file dentro da área
         const fileInput = this.querySelector('input[type="file"]');
-        if (fileInput) {
+        if (fileInput && e.target !== fileInput) {
           log("Clicando no input file manualmente");
           fileInput.click();
         }
@@ -1250,7 +1247,7 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         const newStatus = statusSelect.value;
         
-        // Verificação segura para o input de arquivo - CORREÇÃO AQUI
+        // Verificação segura para o input de arquivo
         const certidaoFileInput = document.getElementById("certidao-file");
         let certidaoFile = null;
         
@@ -1321,7 +1318,7 @@ document.addEventListener("DOMContentLoaded", function () {
         
         const fileSize = (file.size / 1024 / 1024).toFixed(2);
 
-        // Determinar o ícone do arquivo baseado no tipo - MOVIDO PARA O INÍCIO
+        // Determinar o ícone do arquivo baseado no tipo
         const fileIcon = file.type.includes("pdf") ? "file-pdf" : "file-image";
 
         // Validar tipo e tamanho
@@ -1353,10 +1350,15 @@ document.addEventListener("DOMContentLoaded", function () {
         // Exibir informações do arquivo
         const uploadArea = this.closest(".upload-area");
         if (uploadArea) {
-          uploadArea.innerHTML = `
-            <i class="fas fa-${fileIcon}"></i>
-            <p>${file.name} (${fileSize} MB)</p>
-          `;
+          // Atualizar apenas os elementos internos sem remover o input
+          const iconElement = uploadArea.querySelector("i");
+          const textElement = uploadArea.querySelector("p");
+          
+          if (iconElement) iconElement.className = `fas fa-${fileIcon}`;
+          if (textElement) textElement.textContent = `${file.name} (${fileSize} MB)`;
+          
+          // Adicionar classe visual para indicar que um arquivo foi selecionado
+          uploadArea.classList.add("file-selected");
         }
 
         // Adicionar ao container de informações do arquivo

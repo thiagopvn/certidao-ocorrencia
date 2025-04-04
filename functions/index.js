@@ -67,10 +67,10 @@ exports.enviarEmailCertidaoV2 = onCall({
         <p>Se você tiver alguma dúvida ou precisar de assistência adicional, não hesite em nos contatar.</p>
         
         <p>Atenciosamente,</p>
-        <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+        <p><strong>Grupamento Operacional do Comando Geral</strong></p>
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-          <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+          <p>Este é um e-mail automático.</p>
         </div>
       </div>
     `,
@@ -164,10 +164,10 @@ exports.enviarEmailAutomatico = onValueUpdated({
                 <p>Se você tiver alguma dúvida ou precisar de assistência adicional, não hesite em nos contatar.</p>
                 
                 <p>Atenciosamente,</p>
-                <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+                <p><strong>Grupamento Operacional do Comando Geral</strong></p>
                 
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-                  <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+                  <p>Este é um e-mail automático.</p>
                 </div>
               </div>
             `,
@@ -389,8 +389,7 @@ exports.gerarRelatorioMensal = onSchedule({
       // Contagem por status
       if (ocorrencia.status === "Concluído") totalConcluidas++;
       else if (
-        ocorrencia.status === "Pendente" ||
-        ocorrencia.status === "Em Análise"
+        ocorrencia.status === "Pendente"
       )
         totalPendentes++;
       else if (ocorrencia.status === "Cancelado") totalCanceladas++;
@@ -444,7 +443,7 @@ exports.enviarEmailConfirmacao = onCall({
         
         <p>Olá, <strong>${nome}</strong>!</p>
         
-        <p>Confirmamos o recebimento da sua solicitação de certidão de ocorrência. Seu pedido foi registrado em nosso sistema e está aguardando análise.</p>
+        <p>Confirmamos o recebimento da sua solicitação de certidão de ocorrência. Seu pedido foi registrado em nosso sistema e temos o prazo de 15 dias para conclluí-lo.</p>
         
         <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
           <p style="margin: 0; font-size: 14px;">Número de Protocolo</p>
@@ -453,20 +452,20 @@ exports.enviarEmailConfirmacao = onCall({
         
         <p><strong>O que acontece agora?</strong></p>
         <ul style="padding-left: 20px; line-height: 1.6;">
-          <li>Nossa equipe irá analisar sua solicitação;</li>
-          <li>Você será notificado por e-mail quando houver atualizações sobre o seu processo;</li>
+          <li>Nossos militares irão analisar sua solicitação;</li>
+          <li>Você será notificado por e-mail caso seja necessário fornecer infromação adicional;</li>
           <li>Quando sua certidão estiver pronta, você receberá outro e-mail com um link para acessá-la.</li>
         </ul>
         
         <p>Você pode acompanhar o status da sua solicitação a qualquer momento em nosso site, utilizando seu CPF e o número de protocolo informado acima.</p>
         
-        <p>Caso tenha alguma dúvida, responda a este e-mail ou entre em contato com nosso suporte.</p>
+        <p>Caso tenha alguma dúvida, responda a este e-mail ou entre em contato com nosso conosco.</p>
         
         <p>Atenciosamente,</p>
-        <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+        <p><strong>Grupamento Operacional do Comando Geral</strong></p>
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-          <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+          <p>Este é um e-mail automático.</p>
         </div>
       </div>
     `,
@@ -593,6 +592,7 @@ exports.enviarEmailNovaOcorrencia = onValueCreated({
 });
 
 // Função para notificar mudanças de status ao solicitante via e-mail
+// MODIFICADA: Desabilitado o envio de e-mails para atualizações de status
 exports.notificarMudancaStatusEmail = onValueUpdated({
   ref: "/ocorrencias/{occurrenceId}/status",
   region: "us-central1",
@@ -602,118 +602,12 @@ exports.notificarMudancaStatusEmail = onValueUpdated({
   const statusAnterior = event.data.before;
   const novoStatus = event.data.after;
 
-  // Evitar processamento desnecessário se o status não mudou
-  if (statusAnterior === novoStatus) {
-    return null;
-  }
-
-  // Obter informações adicionais da ocorrência
-  const snapshot = await getDatabase()
-    .ref(`/ocorrencias/${occurrenceId}`)
-    .once("value");
-  const ocorrencia = snapshot.val();
-
-  if (!ocorrencia || !ocorrencia.email || !ocorrencia.nome) {
-    console.error(
-      `Ocorrência ${occurrenceId} não encontrada ou sem dados de contato`
-    );
-    return null;
-  }
-
-  // Se o status mudou para "Concluído" e há uma função específica para isso, ignorar
-  if (novoStatus === "Concluído" && ocorrencia.certidao) {
-    // Já existe uma função específica para notificar quando concluído com certidão
-    return null;
-  }
-
-  // Obter texto específico para o status
-  let statusDescricao = "";
-  let corStatus = "#3b82f6"; // Cor padrão (azul)
-
-  switch (novoStatus) {
-    case "Em Análise":
-      statusDescricao =
-        "Sua solicitação está sendo analisada por nossa equipe técnica. Em breve você receberá mais informações.";
-      break;
-    case "Pendente":
-      statusDescricao = "Sua solicitação está pendente de análise.";
-      break;
-    case "Cancelado":
-      statusDescricao =
-        "Sua solicitação foi cancelada. Se você acredita que isso está incorreto, entre em contato com nosso suporte.";
-      corStatus = "#ef4444"; // Vermelho
-      break;
-    default:
-      statusDescricao = `Sua solicitação teve seu status atualizado para "${novoStatus}".`;
-  }
-
-  try {
-    const mailOptions = {
-      from: '"Sistema de Certidões" <gocg.certidao@gmail.com>',
-      to: ocorrencia.email,
-      subject: `Atualização de Status - Solicitação ${occurrenceId}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: ${corStatus}; text-align: center;">Atualização de Status da Solicitação</h2>
-          
-          <p>Olá, <strong>${ocorrencia.nome}</strong>!</p>
-          
-          <p>Informamos que sua solicitação de certidão de ocorrência <strong>${occurrenceId}</strong> teve uma atualização de status.</p>
-          
-          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
-            <p style="margin: 0; font-size: 14px;">Status Atual</p>
-            <p style="margin: 5px 0; font-size: 20px; font-weight: bold; color: ${corStatus};">${novoStatus}</p>
-            <p style="margin: 10px 0 0 0; font-size: 15px;">${statusDescricao}</p>
-          </div>
-          
-          <p>Você pode acompanhar sua solicitação a qualquer momento em nosso site, utilizando seu CPF.</p>
-          
-          <p>Caso tenha alguma dúvida, responda a este e-mail ou entre em contato com nosso suporte.</p>
-          
-          <p>Atenciosamente,</p>
-          <p><strong>Equipe de Certidões de Ocorrência</strong></p>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-            <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
-          </div>
-        </div>
-      `,
-    };
-
-    // Enviar o e-mail
-    const transporter = getTransporter();
-    await transporter.sendMail(mailOptions);
-
-    // Registrar o envio no banco de dados
-    await getDatabase()
-      .ref(`ocorrencias/${occurrenceId}/emailStatusAtualizado`)
-      .push({
-        timestamp: admin.database.ServerValue.TIMESTAMP,
-        statusAnterior: statusAnterior,
-        novoStatus: novoStatus,
-        success: true,
-      });
-
-    console.log(
-      `E-mail de atualização de status enviado para ${ocorrencia.email}`
-    );
-    return { success: true };
-  } catch (error) {
-    console.error("Erro ao enviar e-mail de atualização de status:", error);
-
-    // Registrar a falha no banco de dados
-    await getDatabase()
-      .ref(`ocorrencias/${occurrenceId}/emailStatusAtualizado`)
-      .push({
-        timestamp: admin.database.ServerValue.TIMESTAMP,
-        statusAnterior: statusAnterior,
-        novoStatus: novoStatus,
-        success: false,
-        error: error.message,
-      });
-
-    return { success: false, error: error.message };
-  }
+  // Registrar apenas em log a mudança de status, sem enviar e-mail
+  console.log(`Alteração de status da ocorrência ${occurrenceId} de "${statusAnterior}" para "${novoStatus}"`);
+  console.log("Envio de e-mail de notificação de mudança de status desativado conforme solicitado");
+  
+  // Retornar sem enviar e-mail
+  return null;
 });
 
 // Função para enviar lembretes para ocorrências pendentes há mais de 7 dias
@@ -746,8 +640,7 @@ exports.enviarLembretesOcorrenciasPendentes = onSchedule({
       const ocorrencia = childSnapshot.val();
       // Verificar se a ocorrência está pendente e não recebeu um lembrete recentemente
       if (
-        (ocorrencia.status === "Pendente" ||
-          ocorrencia.status === "Em Análise") &&
+        (ocorrencia.status === "Pendente") &&
         ocorrencia.email &&
         (!ocorrencia.lembretes ||
           !ocorrencia.lembretes.ultimoEnvio ||
@@ -784,15 +677,15 @@ exports.enviarLembretesOcorrenciasPendentes = onSchedule({
               
               <p>Você pode acompanhar o status da sua solicitação a qualquer momento em nosso site, utilizando seu CPF.</p>
               
-              <p>Caso tenha alguma dúvida, por favor, entre em contato com nosso suporte.</p>
+              <p>Caso tenha alguma dúvida, por favor, entre em contato com nosso conosco.</p>
               
               <p>Agradecemos sua paciência e compreensão.</p>
               
               <p>Atenciosamente,</p>
-              <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+              <p><strong>Grupamento Operacional do Comando Geral</strong></p>
               
               <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-                <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+                <p>Este é um e-mail automático.</p>
               </div>
             </div>
           `,
@@ -953,9 +846,7 @@ exports.atualizarContadores = onValueWritten({
       if (!transaction.contadores) {
         transaction.contadores = {
           Pendente: 0,
-          "Em Análise": 0,
           Concluído: 0,
-          Cancelado: 0,
           total: 0,
         };
       }
@@ -1073,10 +964,10 @@ exports.enviarPesquisaSatisfacao = onSchedule({
               <p>Agradecemos sua colaboração!</p>
               
               <p>Atenciosamente,</p>
-              <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+              <p><strong>Grupamento Operacional do Comando Geral</strong></p>
               
               <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-                <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+                <p>Este é um e-mail automático.</p>
               </div>
             </div>
           `,
@@ -1228,10 +1119,10 @@ exports.reenviarEmailCertidao = onCall({
           <p>Se você tiver alguma dúvida ou precisar de assistência adicional, não hesite em nos contatar.</p>
           
           <p>Atenciosamente,</p>
-          <p><strong>Equipe de Certidões de Ocorrência</strong></p>
+          <p><strong>Grupamento Operacional do Comando Geral</strong></p>
           
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-            <p>Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p>
+            <p>Este é um e-mail automático.</p>
           </div>
         </div>
       `,
