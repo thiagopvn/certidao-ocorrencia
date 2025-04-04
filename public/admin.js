@@ -1,6 +1,6 @@
 /**
  * Sistema de Certidões de Ocorrência - Painel Administrativo
- * Versão corrigida
+ * Versão corrigida com suporte a upload direto
  */
 
 // Cache e variáveis globais
@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Encontrar o input file dentro da área
         const fileInput = this.querySelector('input[type="file"]');
         if (fileInput) {
-          console.log("Clicando no input file manualmente");
+          log("Clicando no input file manualmente");
           fileInput.click();
         }
       });
@@ -32,43 +32,41 @@ document.addEventListener("DOMContentLoaded", function () {
         e.preventDefault();
         this.style.borderColor = "var(--primary)";
         this.style.backgroundColor = "rgba(59, 130, 246, 0.05)";
+        this.classList.add("drag-over");
       });
 
       area.addEventListener("dragleave", function (e) {
         e.preventDefault();
         this.style.borderColor = "";
         this.style.backgroundColor = "";
+        this.classList.remove("drag-over");
       });
 
       area.addEventListener("drop", function (e) {
         e.preventDefault();
+        log("Arquivo solto na área de upload");
         this.style.borderColor = "";
         this.style.backgroundColor = "";
+        this.classList.remove("drag-over");
 
         const fileInput = this.querySelector('input[type="file"]');
         if (fileInput && e.dataTransfer.files.length) {
+          // Atribuir os arquivos ao input
           fileInput.files = e.dataTransfer.files;
+          log(`Arquivo atribuído ao input: ${e.dataTransfer.files[0].name}`);
+          
           // Disparar evento de change manualmente
           const event = new Event("change", { bubbles: true });
           fileInput.dispatchEvent(event);
+          log("Evento change disparado");
         }
       });
     });
   }
-  // Verificar se o Firebase está disponível
-  if (typeof firebase === "undefined") {
-    console.error(
-      "Firebase não está definido. Verifique se os scripts estão carregados na ordem correta."
-    );
-    alert(
-      "Erro de inicialização: Firebase não está disponível. Verifique o console para mais detalhes."
-    );
-    return;
-  }
 
-  // Iniciar conexão com Firebase - Verificação adicional
+  // Verificar se o Firebase está disponível
   try {
-    console.log("Verificando conexão com Firebase...");
+    log("Verificando conexão com Firebase...");
     if (!firebase.apps.length) {
       // Este é um backup caso o firebase-config.js não tenha inicializado corretamente
       const firebaseConfig = {
@@ -83,19 +81,21 @@ document.addEventListener("DOMContentLoaded", function () {
       };
 
       firebase.initializeApp(firebaseConfig);
-      console.log("Firebase inicializado pelo admin.js");
+      log("Firebase inicializado pelo admin.js");
     }
 
     // Garantir que as referências aos serviços do Firebase estão disponíveis
     window.database = firebase.database();
     window.storage = firebase.storage();
     window.auth = firebase.auth();
+    window.functions = firebase.functions(); // IMPORTANTE: Adicionado explicitamente aqui!
 
-    console.log("Conexão com Firebase estabelecida com sucesso");
+    log("Conexão com Firebase estabelecida com sucesso");
   } catch (error) {
-    console.error("Erro ao inicializar Firebase:", error);
-    alert(
-      "Erro ao conectar com o Firebase. Verifique o console para mais detalhes."
+    log("Erro ao inicializar Firebase:", "error", error);
+    mostrarAlerta(
+      "Erro ao conectar com o Firebase. Verifique o console para mais detalhes.",
+      "error"
     );
     return;
   }
@@ -141,11 +141,14 @@ document.addEventListener("DOMContentLoaded", function () {
   function log(mensagem, tipo = "log", dados = null) {
     const timestamp = new Date().toISOString();
     const prefixo = `[${timestamp}] ADMIN:`;
-
+    
+    // Corrigido: Usar apenas tipos de console válidos
+    const tipoValido = ["log", "error", "warn", "info"].includes(tipo) ? tipo : "log";
+    
     if (dados) {
-      console[tipo || "log"](prefixo, mensagem, dados);
+      console[tipoValido](prefixo, mensagem, dados);
     } else {
-      console[tipo || "log"](prefixo, mensagem);
+      console[tipoValido](prefixo, mensagem);
     }
   }
 
@@ -468,50 +471,94 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   /**
-   * Atualiza o status de uma ocorrência
+   * Atualiza o status e anexa certidão a uma ocorrência - VERSÃO CORRIGIDA
    */
-  async function atualizarStatusOcorrencia(occurrenceNumber, newStatus) {
+  async function atualizarStatusComCertidao(occurrenceNumber, novoStatus, certidaoFile = null) {
     try {
-      log(
-        `Atualizando status da ocorrência ${occurrenceNumber} para ${newStatus}`
-      );
-
-      await firebase.database().ref(`ocorrencias/${occurrenceNumber}`).update({
-        status: newStatus,
-        dataAtualizacao: Date.now(),
-      });
-
-      log("Status atualizado com sucesso");
-
-      // Atualizar cache se existir
-      if (ocorrenciasCache) {
-        const index = ocorrenciasCache.findIndex(
-          (o) => o.id === occurrenceNumber
-        );
-        if (index !== -1) {
-          ocorrenciasCache[index].status = newStatus;
-          ocorrenciasCache[index].dataAtualizacao = Date.now();
-        }
+      log(`Atualizando ocorrência ${occurrenceNumber} para ${novoStatus}, arquivo: ${certidaoFile ? certidaoFile.name : "nenhum"}`);
+      
+      // Garantir que a database ref está disponível
+      if (!firebase.database) {
+        log("Firebase Database não está disponível", "error");
+        throw new Error("Serviço de Database não está disponível");
       }
-
-      return true;
+      
+      if (novoStatus === "Concluído" && certidaoFile) {
+        // Fazer upload da certidão
+        log("Status concluído com arquivo: iniciando upload...");
+        const certidaoData = await uploadCertidaoComFallback(occurrenceNumber, certidaoFile);
+        log("Upload bem-sucedido, dados da certidão:", "log", certidaoData);
+        
+        // Atualizar registro com certidão e status
+        await firebase.database().ref(`ocorrencias/${occurrenceNumber}`).update({
+          status: novoStatus,
+          certidao: certidaoData,
+          dataAtualizacao: Date.now(),
+        });
+        
+        // Tenta enviar e-mail de notificação, se possível
+        try {
+          if (typeof firebase.functions === "function") {
+            // Buscar dados da ocorrência para enviar e-mail
+            const snapshot = await firebase.database().ref(`ocorrencias/${occurrenceNumber}`).once("value");
+            const ocorrenciaData = snapshot.val();
+            
+            if (ocorrenciaData && ocorrenciaData.email) {
+              const enviarEmailFunction = firebase.functions().httpsCallable("enviarEmailCertidaoV2");
+              
+              // Preparar dados para o e-mail
+              const emailData = {
+                destinatario: ocorrenciaData.email,
+                nome: ocorrenciaData.nome || "Cliente",
+                numeroOcorrencia: occurrenceNumber,
+                certidaoURL: certidaoData.url
+              };
+              
+              log("Tentando enviar e-mail de notificação...");
+              const result = await enviarEmailFunction(emailData);
+              log("Resultado do envio de e-mail:", "log", result);
+            }
+          }
+        } catch (emailError) {
+          // Apenas log o erro, não interrompe o fluxo principal
+          log("Erro ao enviar e-mail de confirmação:", "error", emailError);
+        }
+        
+        return {
+          success: true,
+          message: "Status atualizado e certidão anexada com sucesso!",
+          certidao: certidaoData
+        };
+      } else {
+        // Apenas atualizar status
+        log("Atualizando apenas o status para: " + novoStatus);
+        await firebase.database().ref(`ocorrencias/${occurrenceNumber}`).update({
+          status: novoStatus,
+          dataAtualizacao: Date.now(),
+        });
+        
+        return {
+          success: true,
+          message: "Status atualizado com sucesso!"
+        };
+      }
     } catch (error) {
-      log(`Erro ao atualizar status: ${error.message}`, "error", error);
-      throw new Error(`Erro ao atualizar status: ${error.message}`);
+      log(`Erro ao atualizar: ${error.message}`, "error", error);
+      throw error;
     }
   }
 
   /**
-   * Faz upload de um arquivo de certidão
+   * Estratégia de upload com fallback direto para o Storage - VERSÃO CORRIGIDA
    */
-  /**
-   * Função modificada para upload de certidão com melhor tratamento de erros CORS
-   */
-  async function uploadCertidao(occurrenceNumber, certidaoFile) {
+  async function uploadCertidaoComFallback(occurrenceNumber, certidaoFile) {
     try {
+      // Validar arquivo
       if (!certidaoFile) {
         throw new Error("Nenhum arquivo selecionado");
       }
+
+      log(`Iniciando upload de arquivo: ${certidaoFile.name}, tamanho: ${certidaoFile.size} bytes`);
 
       // Validar tipo de arquivo
       const tiposPermitidos = [
@@ -534,232 +581,132 @@ document.addEventListener("DOMContentLoaded", function () {
         );
       }
 
-      console.log(
-        `Iniciando upload para ocorrência ${occurrenceNumber}: ${certidaoFile.name}`
-      );
-
-      // Mostrar indicador de progresso
+      log(`Tentando upload direto para o Storage: ${occurrenceNumber}`);
+      
+      // Mostrar progresso
       const progressContainer = document.createElement("div");
       progressContainer.className = "upload-progress";
       progressContainer.innerHTML = `
-      <div class="progress-label">Preparando upload: <span>0%</span></div>
-      <div class="progress-bar"><div class="progress-fill"></div></div>
-    `;
+        <div class="progress-label">Preparando upload: <span>0%</span></div>
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+      `;
 
-      // Adicionar ao DOM
-      const uploadSection =
-        document.querySelector(".upload-section") ||
-        document.getElementById("certidao-upload-container");
+      const uploadSection = document.getElementById("file-info-container");
       if (uploadSection) {
+        // Limpar conteúdo anterior se existir
+        uploadSection.innerHTML = '';
         uploadSection.appendChild(progressContainer);
       }
 
-      // Verificar se o Firebase está inicializado corretamente
-      if (!firebase.apps.length) {
-        throw new Error("Firebase não está inicializado corretamente");
+      // Verificar se o Firebase Storage está disponível
+      if (!firebase.storage) {
+        log("Firebase Storage não está disponível", "error");
+        throw new Error("Serviço de Storage não está disponível");
       }
 
-      // Verificar autenticação
-      const user = firebase.auth().currentUser;
-      if (!user) {
-        throw new Error("Usuário não autenticado. Faça login novamente.");
-      }
+      // Configurar storage com referência correta
+      const storageRef = firebase.storage().ref();
+      const filename = `${Date.now()}_${certidaoFile.name.replace(/[^\w.-]/g, "_")}`;
+      const fileRef = storageRef.child(`ocorrencias/${occurrenceNumber}/certidao/${filename}`);
 
-      // Referência do storage com estratégia de falha
-      try {
-        // Verificar se o storage está acessível
-        const storageTest = firebase.storage();
-        if (!storageTest) {
-          throw new Error("Firebase Storage não está disponível");
-        }
+      // Criar metadados customizados
+      const metadata = {
+        contentType: certidaoFile.type,
+        customMetadata: {
+          occurrenceNumber: occurrenceNumber,
+          uploadDate: new Date().toISOString(),
+          uploadedBy: firebase.auth().currentUser?.email || "anonymous",
+        },
+      };
 
-        const filename = `${Date.now()}_${certidaoFile.name.replace(
-          /[^\w.-]/g,
-          "_"
-        )}`;
-        const storagePath = `ocorrencias/${occurrenceNumber}/certidao/${filename}`;
+      // Upload com controle de progresso
+      const uploadTask = fileRef.put(certidaoFile, metadata);
 
-        // Atualizar o indicador de progresso
-        const progressLabel = progressContainer.querySelector(
-          ".progress-label span"
-        );
-        const progressFill = progressContainer.querySelector(".progress-fill");
+      // Monitoramento de progresso e completude
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          "state_changed",
+          // Progresso
+          (snapshot) => {
+            const progress = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            );
+            log(`Upload progresso: ${progress}%`);
 
-        if (progressLabel && progressFill) {
-          progressLabel.textContent = "0%";
-          progressFill.style.width = "0%";
-        }
+            // Atualizar UI com progresso
+            const progressLabel = progressContainer.querySelector(
+              ".progress-label span"
+            );
+            const progressFill =
+              progressContainer.querySelector(".progress-fill");
 
-        // ALTERNATIVA 1: Upload com tratamento especial de CORS
-        try {
-          // Tentar o upload padrão
-          const storageRef = firebase.storage().ref(storagePath);
-          const uploadTask = storageRef.put(certidaoFile);
-
-          uploadTask.on(
-            "state_changed",
-            (snapshot) => {
-              // Progresso
-              const progresso = Math.round(
-                (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-              );
-
-              if (progressLabel && progressFill) {
-                progressLabel.textContent = `${progresso}%`;
-                progressFill.style.width = `${progresso}%`;
-              }
-            },
-            (error) => {
-              console.error("Erro no upload:", error);
-              throw error;
+            if (progressLabel && progressFill) {
+              progressLabel.textContent = `${progress}%`;
+              progressFill.style.width = `${progress}%`;
             }
-          );
+          },
+          // Erro
+          (error) => {
+            log("Erro no upload direto:", "error", error);
 
-          // Aguardar conclusão do upload
-          await uploadTask;
+            if (progressContainer) {
+              progressContainer.innerHTML = `
+                <div class="upload-error">
+                  <i class="fas fa-exclamation-circle"></i>
+                  Erro: ${error.message || "Falha no upload"}
+                </div>
+              `;
+            }
 
-          // Obter URL do arquivo
-          const downloadURL = await storageRef.getDownloadURL();
+            reject(error);
+          },
+          // Sucesso
+          async () => {
+            try {
+              // Obter URL de download
+              const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+              log("Upload concluído, URL obtida: " + downloadURL);
 
-          // Atualizar UI após upload completo
-          if (progressContainer) {
-            progressContainer.innerHTML = `
-            <div class="upload-complete">
-              <i class="fas fa-check-circle"></i>
-              Upload completo!
-            </div>
-          `;
+              if (progressContainer) {
+                progressContainer.innerHTML = `
+                  <div class="upload-complete">
+                    <i class="fas fa-check-circle"></i>
+                    Upload completo!
+                  </div>
+                `;
+              }
+
+              const certidaoData = {
+                nome: certidaoFile.name,
+                url: downloadURL,
+                dataUpload: Date.now(),
+                tamanho: certidaoFile.size,
+                tipo: certidaoFile.type,
+                path: fileRef.fullPath,
+              };
+
+              log("Upload concluído com sucesso!");
+              resolve(certidaoData);
+            } catch (error) {
+              log("Erro ao obter URL:", "error", error);
+
+              if (progressContainer) {
+                progressContainer.innerHTML = `
+                  <div class="upload-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    Erro: ${error.message || "Falha ao finalizar upload"}
+                  </div>
+                `;
+              }
+
+              reject(error);
+            }
           }
-
-          console.log("Upload concluído com sucesso:", downloadURL);
-
-          // Retornar dados do arquivo
-          return {
-            nome: certidaoFile.name,
-            url: downloadURL,
-            dataUpload: Date.now(),
-            tamanho: certidaoFile.size,
-            tipo: certidaoFile.type,
-          };
-        } catch (corsError) {
-          console.error("Erro de CORS durante upload:", corsError);
-
-          // Atualizar o progresso para indicar falha
-          if (progressContainer) {
-            progressContainer.innerHTML = `
-            <div class="upload-error">
-              <i class="fas fa-exclamation-circle"></i>
-              Erro CORS: Não foi possível fazer o upload do arquivo.
-              <p>Tentando solução alternativa...</p>
-            </div>
-          `;
-          }
-
-          // ALTERNATIVA 2: Se houver erro CORS, tentar atualizar apenas os metadados no Database
-          // Isso permite pelo menos registrar a certidão com os dados básicos sem o arquivo
-
-          // Gerar um nome fake para URL (exemplo)
-          const fakeUrl = `https://storage.googleapis.com/certidao-gocg.appspot.com/error_cors/${filename}`;
-
-          // Mostrar alerta
-          alert(`Erro CORS: O arquivo não pôde ser enviado devido a problemas de configuração do servidor. 
-        A certidão será registrada apenas com metadados básicos.
-        Entre em contato com o suporte técnico para resolver o problema de CORS.`);
-
-          if (progressContainer) {
-            progressContainer.innerHTML = `
-            <div class="upload-complete">
-              <i class="fas fa-info-circle"></i>
-              Metadados registrados com sucesso! (Upload parcial)
-            </div>
-          `;
-          }
-
-          // Retornar dados parciais
-          return {
-            nome: certidaoFile.name,
-            url: fakeUrl, // URL fictícia
-            dataUpload: Date.now(),
-            tamanho: certidaoFile.size,
-            tipo: certidaoFile.type,
-            erro: "CORS_ERROR", // Indicador de erro
-            mensagem: "Falha no upload devido a erro de CORS",
-          };
-        }
-      } catch (storageError) {
-        console.error("Erro de storage:", storageError);
-
-        if (progressContainer) {
-          progressContainer.innerHTML = `
-          <div class="upload-error">
-            <i class="fas fa-exclamation-circle"></i>
-            Erro: ${storageError.message || "Falha no acesso ao storage"}
-          </div>
-        `;
-        }
-
-        throw storageError;
-      }
-    } catch (error) {
-      console.error("Erro detalhado do upload:", error);
-
-      // Mostrar mensagem mais descritiva
-      const errorMessage = error.code
-        ? `${error.message} (Código: ${error.code})`
-        : error.message || "Erro desconhecido";
-
-      alert(`Erro ao fazer upload: ${errorMessage}
-    
-    Dicas para resolver:
-    1. Verifique sua conexão com a internet
-    2. Tente reduzir o tamanho do arquivo
-    3. Use um formato diferente (PDF, JPG ou PNG)
-    4. Entre em contato com o suporte técnico informando este erro`);
-
-      throw error;
-    }
-  }
-
-  /**
-   * Envia e-mail com a certidão
-   */
-  async function enviarEmailCertidao(
-    email,
-    nome,
-    occurrenceNumber,
-    certidaoURL
-  ) {
-    try {
-      log(
-        `Enviando e-mail para ${email} referente à ocorrência ${occurrenceNumber}`
-      );
-
-      // Verificar se o módulo functions está disponível
-      if (!firebase.functions) {
-        throw new Error("Firebase Functions não está disponível");
-      }
-
-      // Chamar a função Cloud Function
-      const enviarEmailFunction = firebase
-        .functions()
-        .httpsCallable("enviarEmailCertidao");
-      const resultado = await enviarEmailFunction({
-        destinatario: email,
-        nome: nome,
-        numeroOcorrencia: occurrenceNumber,
-        certidaoURL: certidaoURL,
+        );
       });
-
-      log("Resultado do envio de e-mail:", "info", resultado.data);
-
-      if (!resultado.data.success) {
-        throw new Error(resultado.data.message || "Falha ao enviar e-mail");
-      }
-
-      return resultado.data;
     } catch (error) {
-      log(`Erro ao enviar e-mail: ${error.message}`, "error", error);
-      throw new Error(`Erro ao enviar e-mail: ${error.message}`);
+      log(`Erro no upload: ${error.message}`, "error", error);
+      throw error;
     }
   }
 
@@ -966,61 +913,61 @@ document.addEventListener("DOMContentLoaded", function () {
     const dataOcorrencia = formatarData(ocorrencia.timestamp, true);
 
     card.innerHTML = `
-      <div class="card-header">
-        <div class="ocorrencia-number">${
-          ocorrencia.occurrenceNumber || ocorrencia.id
-        }</div>
-        <div class="ocorrencia-status ${statusClass}">${
+    <div class="card-header">
+      <div class="ocorrencia-number">${
+        ocorrencia.occurrenceNumber || ocorrencia.id
+      }</div>
+      <div class="ocorrencia-status ${statusClass}">${
       ocorrencia.status || "Pendente"
     }</div>
-      </div>
-      <div class="card-body">
-        <div class="ocorrencia-info">
-          <div class="info-row">
-            <i class="fas fa-user"></i>
-            <span class="info-label">Nome:</span>
-            <span class="info-value">${ocorrencia.nome || "N/A"}</span>
-          </div>
-          <div class="info-row">
-            <i class="fas fa-id-card"></i>
-            <span class="info-label">CPF:</span>
-            <span class="info-value">${
-              formatarCPF(ocorrencia.cpf) || "N/A"
-            }</span>
-          </div>
-          <div class="info-row">
-            <i class="fas fa-calendar"></i>
-            <span class="info-label">Data:</span>
-            <span class="info-value">${dataOcorrencia}</span>
-          </div>
-          <div class="info-row">
-            <i class="fas fa-map-marker-alt"></i>
-            <span class="info-label">Local:</span>
-            <span class="info-value">${
-              truncarTexto(ocorrencia.enderecoOcorrencia, 40) || "N/A"
-            }</span>
-          </div>
-          ${
-            ocorrencia.certidao
-              ? `<div class="info-row certidao-row">
-              <i class="fas fa-file-pdf"></i>
-              <span class="info-label">Certidão:</span>
-              <a href="${ocorrencia.certidao.url}" target="_blank" class="visualizar-link">
-                Visualizar <i class="fas fa-external-link-alt"></i>
-              </a>
-            </div>`
-              : ""
-          }
+    </div>
+    <div class="card-body">
+      <div class="ocorrencia-info">
+        <div class="info-row">
+          <i class="fas fa-user"></i>
+          <span class="info-label">Nome:</span>
+          <span class="info-value">${ocorrencia.nome || "N/A"}</span>
         </div>
+        <div class="info-row">
+          <i class="fas fa-id-card"></i>
+          <span class="info-label">CPF:</span>
+          <span class="info-value">${
+            formatarCPF(ocorrencia.cpf) || "N/A"
+          }</span>
+        </div>
+        <div class="info-row">
+          <i class="fas fa-calendar"></i>
+          <span class="info-label">Data:</span>
+          <span class="info-value">${dataOcorrencia}</span>
+        </div>
+        <div class="info-row">
+          <i class="fas fa-map-marker-alt"></i>
+          <span class="info-label">Local:</span>
+          <span class="info-value">${
+            truncarTexto(ocorrencia.enderecoOcorrencia, 40) || "N/A"
+          }</span>
+        </div>
+        ${
+          ocorrencia.certidao
+            ? `<div class="info-row certidao-row">
+            <i class="fas fa-file-pdf"></i>
+            <span class="info-label">Certidão:</span>
+            <a href="${ocorrencia.certidao.url}" target="_blank" class="visualizar-link">
+              Visualizar <i class="fas fa-external-link-alt"></i>
+            </a>
+          </div>`
+            : ""
+        }
       </div>
-      <div class="card-footer">
-        <button class="view-btn" data-id="${
-          ocorrencia.occurrenceNumber || ocorrencia.id
-        }">
-          <i class="fas fa-eye"></i> Ver Detalhes
-        </button>
-      </div>
-    `;
+    </div>
+    <div class="card-footer">
+      <button class="view-btn" data-id="${
+        ocorrencia.occurrenceNumber || ocorrencia.id
+      }">
+        <i class="fas fa-eye"></i> Ver Detalhes
+      </button>
+    </div>
+  `;
 
     // Adicionar evento ao botão
     const viewBtn = card.querySelector(".view-btn");
@@ -1043,6 +990,17 @@ document.addEventListener("DOMContentLoaded", function () {
       if (modalTitle)
         modalTitle.textContent = `Detalhes da Ocorrência: ${occurrenceId}`;
       if (modalBody) mostrarLoading(modalBody, "Carregando detalhes...");
+
+      // Limpar container de upload
+      const fileInfoContainer = document.getElementById("file-info-container");
+      if (fileInfoContainer) {
+        fileInfoContainer.innerHTML = "";
+      }
+
+      // Limpar input de arquivo
+      if (certidaoFileInput) {
+        certidaoFileInput.value = "";
+      }
 
       // Armazenar a ocorrência atual
       currentOccurrence = occurrenceId;
@@ -1068,109 +1026,109 @@ document.addEventListener("DOMContentLoaded", function () {
 
       // Preparar HTML do modal
       const html = `
-        <div class="status-section">
-          <h3>Status: <span class="status-badge ${ocorrencia.status
-            .toLowerCase()
-            .replace(" ", "-")
-            .replace("í", "i")}">${ocorrencia.status}</span></h3>
-          <p><strong>Data da solicitação:</strong> ${dataFormatada}</p>
-          ${
-            ocorrencia.dataAtualizacao
-              ? `<p><strong>Última atualização:</strong> ${formatarData(
-                  ocorrencia.dataAtualizacao,
-                  true
-                )}</p>`
-              : ""
-          }
-        </div>
-        
+      <div class="status-section">
+        <h3>Status: <span class="status-badge ${ocorrencia.status
+          .toLowerCase()
+          .replace(" ", "-")
+          .replace("í", "i")}">${ocorrencia.status}</span></h3>
+        <p><strong>Data da solicitação:</strong> ${dataFormatada}</p>
         ${
-          ocorrencia.certidao
-            ? `
-        <div class="modal-section">
-          <div class="section-title"><i class="fas fa-file-pdf"></i> Certidão Anexada</div>
-          <div class="certidao-info">
-            <p><strong>Nome do arquivo:</strong> ${ocorrencia.certidao.nome}</p>
-            <p><strong>Data de upload:</strong> ${formatarData(
-              ocorrencia.certidao.dataUpload,
-              true
-            )}</p>
-            <p><a href="${
-              ocorrencia.certidao.url
-            }" target="_blank" class="download-btn"><i class="fas fa-download"></i> Visualizar/Baixar Certidão</a></p>
-          </div>
-        </div>
-        `
+          ocorrencia.dataAtualizacao
+            ? `<p><strong>Última atualização:</strong> ${formatarData(
+                ocorrencia.dataAtualizacao,
+                true
+              )}</p>`
             : ""
         }
-        
-        <div class="modal-section">
-          <div class="section-title"><i class="fas fa-user-circle"></i> Informações do Solicitante</div>
-          <div class="info-grid">
-            <div class="info-item">
-              <label>Nome:</label>
-              <p>${ocorrencia.nome || "N/A"}</p>
-            </div>
-            <div class="info-item">
-              <label>CPF:</label>
-              <p>${formatarCPF(ocorrencia.cpf) || "N/A"}</p>
-            </div>
-            <div class="info-item">
-              <label>RG:</label>
-              <p>${ocorrencia.rg || "N/A"}</p>
-            </div>
-            <div class="info-item">
-              <label>E-mail:</label>
-              <p>${ocorrencia.email || "N/A"}</p>
-            </div>
-            <div class="info-item">
-              <label>Telefone:</label>
-              <p>${ocorrencia.telefone || "N/A"}</p>
-            </div>
-            <div class="info-item">
-              <label>Endereço:</label>
-              <p>${ocorrencia.enderecoSolicitante || "N/A"}</p>
-            </div>
+      </div>
+      
+      ${
+        ocorrencia.certidao
+          ? `
+      <div class="modal-section">
+        <div class="section-title"><i class="fas fa-file-pdf"></i> Certidão Anexada</div>
+        <div class="certidao-info">
+          <p><strong>Nome do arquivo:</strong> ${ocorrencia.certidao.nome}</p>
+          <p><strong>Data de upload:</strong> ${formatarData(
+            ocorrencia.certidao.dataUpload,
+            true
+          )}</p>
+          <p><a href="${
+            ocorrencia.certidao.url
+          }" target="_blank" class="download-btn"><i class="fas fa-download"></i> Visualizar/Baixar Certidão</a></p>
+        </div>
+      </div>
+      `
+          : ""
+      }
+      
+      <div class="modal-section">
+        <div class="section-title"><i class="fas fa-user-circle"></i> Informações do Solicitante</div>
+        <div class="info-grid">
+          <div class="info-item">
+            <label>Nome:</label>
+            <p>${ocorrencia.nome || "N/A"}</p>
+          </div>
+          <div class="info-item">
+            <label>CPF:</label>
+            <p>${formatarCPF(ocorrencia.cpf) || "N/A"}</p>
+          </div>
+          <div class="info-item">
+            <label>RG:</label>
+            <p>${ocorrencia.rg || "N/A"}</p>
+          </div>
+          <div class="info-item">
+            <label>E-mail:</label>
+            <p>${ocorrencia.email || "N/A"}</p>
+          </div>
+          <div class="info-item">
+            <label>Telefone:</label>
+            <p>${ocorrencia.telefone || "N/A"}</p>
+          </div>
+          <div class="info-item">
+            <label>Endereço:</label>
+            <p>${ocorrencia.enderecoSolicitante || "N/A"}</p>
           </div>
         </div>
-        
-        <div class="modal-section">
-          <div class="section-title"><i class="fas fa-exclamation-circle"></i> Detalhes da Ocorrência</div>
-          <div class="info-grid">
-            <div class="info-item">
-              <label>Data da Ocorrência:</label>
-              <p>${dataOcorrencia}</p>
-            </div>
-            <div class="info-item">
-              <label>Hora da Ocorrência:</label>
-              <p>${ocorrencia.horaOcorrencia || "N/A"}</p>
-            </div>
-            <div class="info-item full-width">
-              <label>Local da Ocorrência:</label>
-              <p>${ocorrencia.enderecoOcorrencia || "N/A"}</p>
-            </div>
-            <div class="info-item full-width">
-              <label>Descrição:</label>
-              <p class="description-text">${
-                ocorrencia.descricao || "Sem descrição"
-              }</p>
-            </div>
+      </div>
+      
+      <div class="modal-section">
+        <div class="section-title"><i class="fas fa-exclamation-circle"></i> Detalhes da Ocorrência</div>
+        <div class="info-grid">
+          <div class="info-item">
+            <label>Data da Ocorrência:</label>
+            <p>${dataOcorrencia}</p>
+          </div>
+          <div class="info-item">
+            <label>Hora da Ocorrência:</label>
+            <p>${ocorrencia.horaOcorrencia || "N/A"}</p>
+          </div>
+          <div class="info-item full-width">
+            <label>Local da Ocorrência:</label>
+            <p>${ocorrencia.enderecoOcorrencia || "N/A"}</p>
+          </div>
+          <div class="info-item full-width">
+            <label>Descrição:</label>
+            <p class="description-text">${
+              ocorrencia.descricao || "Sem descrição"
+            }</p>
           </div>
         </div>
-        
-        ${
-          ocorrencia.documentos
-            ? `
-        <div class="modal-section">
-          <div class="section-title"><i class="fas fa-file-alt"></i> Documentos Anexados</div>
-          <div class="documentos-list">
-            ${getDocumentosHTML(ocorrencia.documentos)}
-          </div>
+      </div>
+      
+      ${
+        ocorrencia.documentos
+          ? `
+      <div class="modal-section">
+        <div class="section-title"><i class="fas fa-file-alt"></i> Documentos Anexados</div>
+        <div class="documentos-list">
+          ${getDocumentosHTML(ocorrencia.documentos)}
         </div>
-        `
-            : ""
-        }
-      `;
+      </div>
+      `
+          : ""
+      }
+    `;
 
       // Atualizar conteúdo do modal
       if (modalBody) {
@@ -1207,67 +1165,67 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (documentos.documentoIdentidade) {
       html += `
-        <div class="documento-item">
-          <div class="documento-icon"><i class="fas fa-id-card"></i></div>
-          <div class="documento-info">
-            <p class="documento-name">Documento de Identidade</p>
-            <p class="documento-type">${documentos.documentoIdentidade.nome}</p>
-          </div>
-          <div class="documento-actions">
-            <a href="${documentos.documentoIdentidade.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
-            <a href="${documentos.documentoIdentidade.url}" download title="Baixar"><i class="fas fa-download"></i></a>
-          </div>
+      <div class="documento-item">
+        <div class="documento-icon"><i class="fas fa-id-card"></i></div>
+        <div class="documento-info">
+          <p class="documento-name">Documento de Identidade</p>
+          <p class="documento-type">${documentos.documentoIdentidade.nome}</p>
         </div>
-      `;
+        <div class="documento-actions">
+          <a href="${documentos.documentoIdentidade.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
+          <a href="${documentos.documentoIdentidade.url}" download title="Baixar"><i class="fas fa-download"></i></a>
+        </div>
+      </div>
+    `;
     }
 
     if (documentos.comprovanteResidencia) {
       html += `
-        <div class="documento-item">
-          <div class="documento-icon"><i class="fas fa-home"></i></div>
-          <div class="documento-info">
-            <p class="documento-name">Comprovante de Residência</p>
-            <p class="documento-type">${documentos.comprovanteResidencia.nome}</p>
-          </div>
-          <div class="documento-actions">
-            <a href="${documentos.comprovanteResidencia.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
-            <a href="${documentos.comprovanteResidencia.url}" download title="Baixar"><i class="fas fa-download"></i></a>
-          </div>
+      <div class="documento-item">
+        <div class="documento-icon"><i class="fas fa-home"></i></div>
+        <div class="documento-info">
+          <p class="documento-name">Comprovante de Residência</p>
+          <p class="documento-type">${documentos.comprovanteResidencia.nome}</p>
         </div>
-      `;
+        <div class="documento-actions">
+          <a href="${documentos.comprovanteResidencia.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
+          <a href="${documentos.comprovanteResidencia.url}" download title="Baixar"><i class="fas fa-download"></i></a>
+        </div>
+      </div>
+    `;
     }
 
     if (documentos.documentoCarro) {
       html += `
-        <div class="documento-item">
-          <div class="documento-icon"><i class="fas fa-car"></i></div>
-          <div class="documento-info">
-            <p class="documento-name">Documento do Carro</p>
-            <p class="documento-type">${documentos.documentoCarro.nome}</p>
-          </div>
-          <div class="documento-actions">
-            <a href="${documentos.documentoCarro.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
-            <a href="${documentos.documentoCarro.url}" download title="Baixar"><i class="fas fa-download"></i></a>
-          </div>
+      <div class="documento-item">
+        <div class="documento-icon"><i class="fas fa-car"></i></div>
+        <div class="documento-info">
+          <p class="documento-name">Documento do Carro</p>
+          <p class="documento-type">${documentos.documentoCarro.nome}</p>
         </div>
-      `;
+        <div class="documento-actions">
+          <a href="${documentos.documentoCarro.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
+          <a href="${documentos.documentoCarro.url}" download title="Baixar"><i class="fas fa-download"></i></a>
+        </div>
+      </div>
+    `;
     }
 
     if (documentos.outrosDocumentos && documentos.outrosDocumentos.length > 0) {
       documentos.outrosDocumentos.forEach((doc) => {
         html += `
-          <div class="documento-item">
-            <div class="documento-icon"><i class="fas fa-file-alt"></i></div>
-            <div class="documento-info">
-              <p class="documento-name">Documento Adicional</p>
-              <p class="documento-type">${doc.nome}</p>
-            </div>
-            <div class="documento-actions">
-              <a href="${doc.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
-              <a href="${doc.url}" download title="Baixar"><i class="fas fa-download"></i></a>
-            </div>
+        <div class="documento-item">
+          <div class="documento-icon"><i class="fas fa-file-alt"></i></div>
+          <div class="documento-info">
+            <p class="documento-name">Documento Adicional</p>
+            <p class="documento-type">${doc.nome}</p>
           </div>
-        `;
+          <div class="documento-actions">
+            <a href="${doc.url}" target="_blank" title="Visualizar"><i class="fas fa-eye"></i></a>
+            <a href="${doc.url}" download title="Baixar"><i class="fas fa-download"></i></a>
+          </div>
+        </div>
+      `;
       });
     }
 
@@ -1286,86 +1244,59 @@ document.addEventListener("DOMContentLoaded", function () {
 
       // Salvar texto original e mostrar loading
       const btnText = updateStatusBtn.innerHTML;
-      updateStatusBtn.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+      updateStatusBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
       updateStatusBtn.disabled = true;
 
       try {
         const newStatus = statusSelect.value;
+        
+        // Verificação segura para o input de arquivo - CORREÇÃO AQUI
+        const certidaoFileInput = document.getElementById("certidao-file");
+        let certidaoFile = null;
+        
+        // Adicionar log para debug
+        log("Verificando arquivo de certidão...");
+        
+        if (certidaoFileInput && certidaoFileInput.files && certidaoFileInput.files.length > 0) {
+          certidaoFile = certidaoFileInput.files[0];
+          log(`Arquivo encontrado: ${certidaoFile.name}, tipo: ${certidaoFile.type}, tamanho: ${certidaoFile.size} bytes`);
+        } else {
+          log("Nenhum arquivo encontrado no input");
+        }
 
         // Se o status é "Concluído", verificar se há certidão
         if (newStatus === "Concluído") {
           // Verificar se já existe uma certidão anexada
           const ocorrencia = await carregarOcorrencia(currentOccurrence);
 
-          const temCertidao =
+          const temCertidao = 
             ocorrencia && ocorrencia.certidao && ocorrencia.certidao.url;
-          const temNovoArquivo =
-            certidaoFileInput &&
-            certidaoFileInput.files &&
-            certidaoFileInput.files.length > 0;
-
-          if (!temCertidao && !temNovoArquivo) {
+          
+          log(`Status concluído selecionado. Tem certidão existente: ${temCertidao}, Novo arquivo: ${certidaoFile ? 'Sim' : 'Não'}`);
+          
+          if (!temCertidao && !certidaoFile) {
             throw new Error(
               "É necessário anexar uma certidão antes de concluir a solicitação."
             );
           }
-
-          // Se tem novo arquivo, fazer upload
-          if (temNovoArquivo) {
-            const certidaoData = await uploadCertidao(
-              currentOccurrence,
-              certidaoFileInput.files[0]
-            );
-
-            // Atualizar status e certidão
-            await firebase
-              .database()
-              .ref(`ocorrencias/${currentOccurrence}`)
-              .update({
-                status: newStatus,
-                certidao: certidaoData,
-                dataAtualizacao: Date.now(),
-              });
-
-            // Enviar e-mail se tiver funcionalidade
-            if (firebase.functions && ocorrencia.email) {
-              try {
-                await enviarEmailCertidao(
-                  ocorrencia.email,
-                  ocorrencia.nome,
-                  currentOccurrence,
-                  certidaoData.url
-                );
-                mostrarAlerta(
-                  "Status atualizado e e-mail enviado com sucesso!",
-                  "success"
-                );
-              } catch (emailError) {
-                mostrarAlerta(
-                  `Status atualizado, mas houve erro ao enviar e-mail: ${emailError.message}`,
-                  "warning"
-                );
-              }
-            } else {
-              mostrarAlerta("Status atualizado com sucesso!", "success");
-            }
-          } else {
-            // Apenas atualizar status
-            await atualizarStatusOcorrencia(currentOccurrence, newStatus);
-            mostrarAlerta("Status atualizado com sucesso!", "success");
-          }
-        } else {
-          // Para outros status, apenas atualizar
-          await atualizarStatusOcorrencia(currentOccurrence, newStatus);
-          mostrarAlerta("Status atualizado com sucesso!", "success");
         }
+
+        // Atualizar status e certidão se existir
+        const resultado = await atualizarStatusComCertidao(
+          currentOccurrence, 
+          newStatus, 
+          certidaoFile
+        );
+
+        // Mostrar mensagem de sucesso
+        mostrarAlerta(resultado.message, "success");
 
         // Fechar modal e recarregar dados
         if (detailModal) {
           detailModal.style.display = "none";
         }
 
+        // Recarregar dados
         loadDashboardData();
       } catch (error) {
         log(`Erro ao atualizar: ${error.message}`, "error", error);
@@ -1382,9 +1313,16 @@ document.addEventListener("DOMContentLoaded", function () {
   // Exibir informações sobre arquivo selecionado
   if (certidaoFileInput) {
     certidaoFileInput.addEventListener("change", function () {
+      log("Evento change do input de arquivo acionado");
+      
       if (this.files && this.files.length > 0) {
         const file = this.files[0];
+        log(`Arquivo selecionado: ${file.name}, tipo: ${file.type}, tamanho: ${file.size} bytes`);
+        
         const fileSize = (file.size / 1024 / 1024).toFixed(2);
+
+        // Determinar o ícone do arquivo baseado no tipo - MOVIDO PARA O INÍCIO
+        const fileIcon = file.type.includes("pdf") ? "file-pdf" : "file-image";
 
         // Validar tipo e tamanho
         const tiposPermitidos = [
@@ -1393,6 +1331,7 @@ document.addEventListener("DOMContentLoaded", function () {
           "image/jpg",
           "image/png",
         ];
+        
         if (!tiposPermitidos.includes(file.type)) {
           mostrarAlerta(
             "Tipo de arquivo não permitido. Use PDF, JPG ou PNG.",
@@ -1414,14 +1353,29 @@ document.addEventListener("DOMContentLoaded", function () {
         // Exibir informações do arquivo
         const uploadArea = this.closest(".upload-area");
         if (uploadArea) {
-          const fileIcon = file.type.includes("pdf")
-            ? "file-pdf"
-            : "file-image";
           uploadArea.innerHTML = `
             <i class="fas fa-${fileIcon}"></i>
             <p>${file.name} (${fileSize} MB)</p>
           `;
         }
+
+        // Adicionar ao container de informações do arquivo
+        const fileInfoContainer = document.getElementById("file-info-container");
+        if (fileInfoContainer) {
+          fileInfoContainer.innerHTML = `
+            <div class="file-info">
+              <div class="file-preview">
+                <i class="fas fa-${fileIcon} file-icon"></i>
+                <div class="file-details">
+                  <p class="file-name">${file.name}</p>
+                  <p class="file-meta">${fileSize} MB</p>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      } else {
+        log("Nenhum arquivo selecionado no evento change");
       }
     });
   }

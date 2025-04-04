@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sistema de Certidões - Área Administrativa</title>
+    <!-- Meta tag para lidar com CORS -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
     <!-- Estilos CSS -->
     <link
       rel="stylesheet"
@@ -281,6 +283,8 @@
               />
             </div>
             <small>Formatos aceitos: PDF, JPG, PNG (máx. 10MB)</small>
+            <!-- Container para informações do arquivo e progresso -->
+            <div id="file-info-container"></div>
           </div>
 
           <div class="status-update">
@@ -318,6 +322,15 @@
         <a href="#" class="view-all">Ver todas as notificações</a>
       </div>
     </div>
+
+    <!-- Template para mensagens de alerta (usado pelo JavaScript) -->
+    <template id="alert-template">
+      <div class="alerta">
+        <i class="fas fa-info-circle"></i>
+        <span></span>
+        <button class="fechar-alerta"><i class="fas fa-times"></i></button>
+      </div>
+    </template>
 
     <!-- Scripts -->
     <script src="admin.js"></script>

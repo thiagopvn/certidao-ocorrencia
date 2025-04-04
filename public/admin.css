@@ -1823,3 +1823,159 @@ body {
     max-width: none;
   }
 }
+
+/* Adicione este código ao final do seu arquivo admin.css */
+
+/* Melhor feedback visual para área de upload */
+.upload-area {
+  position: relative;
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--radius);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: var(--gray-50);
+  margin-bottom: 1rem;
+}
+
+.upload-area:hover,
+.upload-area.drag-over {
+  border-color: var(--primary);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.upload-area.drag-over {
+  border-style: solid;
+  transform: scale(1.02);
+}
+
+.upload-area i {
+  font-size: 2rem;
+  color: var(--gray-400);
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.upload-area p {
+  margin: 0;
+  color: var(--gray-600);
+}
+
+.upload-area input[type="file"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+/* Melhorias na visualização de arquivo selecionado */
+.file-selected {
+  border-color: var(--primary) !important;
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+.file-selected i {
+  color: var(--primary) !important;
+}
+
+.file-selected p {
+  color: var(--gray-800) !important;
+  font-weight: 500;
+}
+
+/* Melhorias no progresso de upload */
+.upload-progress {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.progress-bar {
+  height: 0.5rem;
+  background-color: var(--gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.upload-complete {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--success);
+  font-weight: 500;
+  padding: 0.5rem 0;
+}
+
+.upload-complete i {
+  color: var(--success);
+}
+
+.upload-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--danger);
+  font-weight: 500;
+  padding: 0.5rem 0;
+}
+
+.upload-error i {
+  color: var(--danger);
+}
+
+/* Visualização de arquivo */
+.file-info {
+  background-color: var(--primary-bg);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.file-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.file-icon {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.file-details {
+  flex: 1;
+}
+
+.file-name {
+  font-weight: 500;
+  color: var(--gray-800);
+  margin-bottom: 0.25rem;
+  word-break: break-all;
+}
+
+.file-meta {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
