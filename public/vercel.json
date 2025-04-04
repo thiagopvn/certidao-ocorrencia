@@ -2,9 +2,15 @@
   "name": "sistema-certidoes",
   "version": 2,
   "public": true,
+  "cleanUrls": true,
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/admin/(.*)", "destination": "/admin.html" }
+  ],
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/admin/(.*)", "dest": "/admin.html" }
   ],
   "trailingSlash": false
 }
