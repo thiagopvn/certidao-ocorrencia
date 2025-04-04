@@ -9,6 +9,7 @@ let ultimaAtualizacaoCache = 0;
 const TEMPO_EXPIRACAO_CACHE = 5 * 60 * 1000; // 5 minutos
 let currentOccurrence = null;
 let isSubmitting = false;
+let isUploadingAdditionalDoc = false; // Nova flag para controlar upload de documentos adicionais
 
 document.addEventListener("DOMContentLoaded", function () {
   // Melhorar interatividade da área de upload
@@ -71,7 +72,7 @@ document.addEventListener("DOMContentLoaded", function () {
         authDomain: "certidao-gocg.firebaseapp.com",
         databaseURL: "https://certidao-gocg-default-rtdb.firebaseio.com",
         projectId: "certidao-gocg",
-        storageBucket: "certidao-gocg.appspot.com",
+        storageBucket: "certidao-gocg.firebasestorage.app",
         messagingSenderId: "684546571684",
         appId: "1:684546571684:web:c104197a7c6b1c9f7a5531",
         measurementId: "G-YZHFGW74Y7",
@@ -707,6 +708,582 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // ===== FUNÇÕES PARA UPLOAD DE DOCUMENTOS ADICIONAIS =====
+
+  /**
+   * Faz upload de um documento adicional
+   */
+  async function uploadAdditionalDocument(occurrenceNumber, documentFile, documentType) {
+    try {
+      // Validar arquivo
+      if (!documentFile) {
+        throw new Error("Nenhum arquivo selecionado");
+      }
+
+      log(`Iniciando upload de documento adicional: ${documentFile.name}, tipo: ${documentType}`);
+
+      // Validar tipo de arquivo
+      const tiposPermitidos = [
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ];
+      
+      if (!tiposPermitidos.includes(documentFile.type)) {
+        throw new Error("Tipo de arquivo não permitido. Use PDF, JPG, PNG, DOC ou DOCX.");
+      }
+
+      // Validar tamanho (máximo 10MB)
+      const tamanhoMaximo = 10 * 1024 * 1024;
+      if (documentFile.size > tamanhoMaximo) {
+        throw new Error(
+          `Arquivo muito grande (${(documentFile.size / 1024 / 1024).toFixed(2)}MB). O limite é 10MB.`
+        );
+      }
+
+      // Mostrar progresso
+      const progressContainer = document.createElement("div");
+      progressContainer.className = "upload-progress";
+      progressContainer.innerHTML = `
+        <div class="progress-label">Preparando upload: <span>0%</span></div>
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+      `;
+
+      const uploadSection = document.getElementById("additional-docs-progress");
+      if (uploadSection) {
+        // Limpar conteúdo anterior se existir
+        uploadSection.innerHTML = '';
+        uploadSection.appendChild(progressContainer);
+      }
+
+      // Verificar se o Firebase Storage está disponível
+      if (!firebase.storage) {
+        log("Firebase Storage não está disponível", "error");
+        throw new Error("Serviço de Storage não está disponível");
+      }
+
+      // Configurar storage com referência correta
+      const storageRef = firebase.storage().ref();
+      const filename = `${Date.now()}_${documentFile.name.replace(/[^\w.-]/g, "_")}`;
+      const fileRef = storageRef.child(`ocorrencias/${occurrenceNumber}/documentos_adicionais/${documentType}/${filename}`);
+
+      // Criar metadados customizados
+      const metadata = {
+        contentType: documentFile.type,
+        customMetadata: {
+          occurrenceNumber: occurrenceNumber,
+          uploadDate: new Date().toISOString(),
+          uploadedBy: firebase.auth().currentUser?.email || "admin",
+          documentType: documentType
+        },
+      };
+
+      // Upload com controle de progresso
+      const uploadTask = fileRef.put(documentFile, metadata);
+
+      // Monitoramento de progresso e completude
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          "state_changed",
+          // Progresso
+          (snapshot) => {
+            const progress = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            );
+            log(`Upload progresso: ${progress}%`);
+
+            // Atualizar UI com progresso
+            const progressLabel = progressContainer.querySelector(
+              ".progress-label span"
+            );
+            const progressFill =
+              progressContainer.querySelector(".progress-fill");
+
+            if (progressLabel && progressFill) {
+              progressLabel.textContent = `${progress}%`;
+              progressFill.style.width = `${progress}%`;
+            }
+          },
+          // Erro
+          (error) => {
+            log("Erro no upload do documento adicional:", "error", error);
+
+            if (progressContainer) {
+              progressContainer.innerHTML = `
+                <div class="upload-error">
+                  <i class="fas fa-exclamation-circle"></i>
+                  Erro: ${error.message || "Falha no upload"}
+                </div>
+              `;
+            }
+
+            reject(error);
+          },
+          // Sucesso
+          async () => {
+            try {
+              // Obter URL de download
+              const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+              log("Upload concluído, URL obtida: " + downloadURL);
+
+              if (progressContainer) {
+                progressContainer.innerHTML = `
+                  <div class="upload-complete">
+                    <i class="fas fa-check-circle"></i>
+                    Upload completo!
+                  </div>
+                `;
+              }
+
+              const documentData = {
+                nome: documentFile.name,
+                url: downloadURL,
+                dataUpload: Date.now(),
+                tamanho: documentFile.size,
+                tipo: documentFile.type,
+                path: fileRef.fullPath,
+                tipoDocumento: documentType,
+                uploadedBy: firebase.auth().currentUser?.email || "admin"
+              };
+
+              log("Upload de documento adicional concluído com sucesso!");
+              resolve(documentData);
+            } catch (error) {
+              log("Erro ao obter URL:", "error", error);
+
+              if (progressContainer) {
+                progressContainer.innerHTML = `
+                  <div class="upload-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    Erro: ${error.message || "Falha ao finalizar upload"}
+                  </div>
+                `;
+              }
+
+              reject(error);
+            }
+          }
+        );
+      });
+    } catch (error) {
+      log(`Erro no upload: ${error.message}`, "error", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Salva um documento adicional no banco de dados
+   */
+  async function saveAdditionalDocument(occurrenceNumber, documentData) {
+    try {
+      log(`Salvando documento adicional no banco de dados para ${occurrenceNumber}`);
+      
+      // Referência para o nó de documentos adicionais desta ocorrência
+      const dbRef = firebase.database().ref(`ocorrencias/${occurrenceNumber}/documentos_adicionais`);
+      
+      // Gerar uma chave única para o documento
+      const newDocRef = dbRef.push();
+      
+      // Salvar os dados do documento
+      await newDocRef.set({
+        ...documentData,
+        id: newDocRef.key,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      
+      log("Documento adicional salvo com sucesso no banco de dados");
+      
+      // Atualizar o campo de data de atualização da ocorrência
+      await firebase.database().ref(`ocorrencias/${occurrenceNumber}`).update({
+        dataAtualizacao: Date.now()
+      });
+      
+      return {
+        success: true,
+        documentId: newDocRef.key,
+        message: "Documento adicional anexado com sucesso!"
+      };
+    } catch (error) {
+      log(`Erro ao salvar documento adicional: ${error.message}`, "error", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Carrega os documentos adicionais de uma ocorrência
+   */
+  async function loadAdditionalDocuments(occurrenceNumber) {
+    try {
+      log(`Carregando documentos adicionais para ${occurrenceNumber}`);
+      
+      const snapshot = await firebase.database().ref(`ocorrencias/${occurrenceNumber}/documentos_adicionais`).once("value");
+      
+      if (!snapshot.exists()) {
+        log("Nenhum documento adicional encontrado");
+        return [];
+      }
+      
+      const documentos = [];
+      snapshot.forEach(childSnapshot => {
+        documentos.push({
+          id: childSnapshot.key,
+          ...childSnapshot.val()
+        });
+      });
+      
+      // Ordenar por data de upload, mais recentes primeiro
+      documentos.sort((a, b) => b.dataUpload - a.dataUpload);
+      
+      log(`${documentos.length} documentos adicionais carregados`);
+      return documentos;
+    } catch (error) {
+      log(`Erro ao carregar documentos adicionais: ${error.message}`, "error", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove um documento adicional
+   */
+  async function removeAdditionalDocument(occurrenceNumber, documentId, storagePath) {
+    try {
+      log(`Removendo documento adicional ID: ${documentId}`);
+      
+      // Primeiro remover do Storage
+      if (storagePath) {
+        const storageRef = firebase.storage().ref(storagePath);
+        await storageRef.delete();
+        log("Arquivo removido do Storage");
+      }
+      
+      // Depois remover do Database
+      await firebase.database().ref(`ocorrencias/${occurrenceNumber}/documentos_adicionais/${documentId}`).remove();
+      log("Documento removido do banco de dados");
+      
+      return {
+        success: true,
+        message: "Documento removido com sucesso!"
+      };
+    } catch (error) {
+      log(`Erro ao remover documento: ${error.message}`, "error", error);
+      throw error;
+    }
+  }
+
+  // ===== FUNÇÕES DE INTERFACE PARA DOCUMENTOS ADICIONAIS =====
+
+  /**
+   * Inicializa a interface de documentos adicionais
+   */
+  function initializeAdditionalDocumentsUI() {
+    // Referência para os elementos da UI
+    const additionalDocFile = document.getElementById("additional-document-file");
+    const uploadAdditionalDocBtn = document.getElementById("upload-additional-doc-btn");
+    const uploadArea = document.querySelector(".upload-area-additional");
+    
+    // Adicionar feedback visual para área de upload
+    if (uploadArea) {
+      // Efeito visual ao arrastar arquivo
+      uploadArea.addEventListener("dragover", function(e) {
+        e.preventDefault();
+        this.classList.add("drag-over");
+      });
+      
+      uploadArea.addEventListener("dragleave", function(e) {
+        e.preventDefault();
+        this.classList.remove("drag-over");
+      });
+      
+      uploadArea.addEventListener("drop", function(e) {
+        e.preventDefault();
+        this.classList.remove("drag-over");
+        
+        if (e.dataTransfer.files.length > 0) {
+          additionalDocFile.files = e.dataTransfer.files;
+          // Mostrar informações do arquivo selecionado
+          updateAdditionalDocFileInfo();
+        }
+      });
+      
+      // Ao clicar na área, acionar o input file
+      uploadArea.addEventListener("click", function(e) {
+        if (e.target !== additionalDocFile) {
+          additionalDocFile.click();
+        }
+      });
+    }
+    
+    // Mostrar informações do arquivo quando selecionado
+    if (additionalDocFile) {
+      additionalDocFile.addEventListener("change", updateAdditionalDocFileInfo);
+    }
+    
+    // Evento de upload do documento adicional
+    if (uploadAdditionalDocBtn) {
+      uploadAdditionalDocBtn.addEventListener("click", handleAdditionalDocUpload);
+    }
+  }
+
+  /**
+   * Atualiza as informações do arquivo adicional selecionado
+   */
+  function updateAdditionalDocFileInfo() {
+    const fileInput = document.getElementById("additional-document-file");
+    const uploadArea = document.querySelector(".upload-area-additional");
+    const progressSection = document.getElementById("additional-docs-progress");
+    
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      return;
+    }
+    
+    const file = fileInput.files[0];
+    const fileSize = (file.size / 1024 / 1024).toFixed(2);
+    
+    // Determinar o ícone com base no tipo de arquivo
+    let fileIcon = "file-alt";
+    if (file.type.includes("pdf")) {
+      fileIcon = "file-pdf";
+    } else if (file.type.includes("image")) {
+      fileIcon = "file-image";
+    } else if (file.type.includes("word")) {
+      fileIcon = "file-word";
+    }
+    
+    // Atualizar a interface da área de upload
+    if (uploadArea) {
+      const iconElement = uploadArea.querySelector("i");
+      const textElement = uploadArea.querySelector("p");
+      
+      if (iconElement) iconElement.className = `fas fa-${fileIcon}`;
+      if (textElement) textElement.textContent = `${file.name} (${fileSize} MB)`;
+    }
+    
+    // Mostrar informações do arquivo na seção de progresso
+    if (progressSection) {
+      progressSection.innerHTML = `
+        <div class="file-info">
+          <div class="file-preview">
+            <i class="fas fa-${fileIcon} file-icon"></i>
+            <div class="file-details">
+              <p class="file-name">${file.name}</p>
+              <p class="file-meta">${fileSize} MB</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Manipula o upload de um documento adicional
+   */
+  async function handleAdditionalDocUpload() {
+    if (!currentOccurrence || isUploadingAdditionalDoc) {
+      return;
+    }
+    
+    const fileInput = document.getElementById("additional-document-file");
+    const documentTypeSelect = document.getElementById("document-type");
+    const uploadButton = document.getElementById("upload-additional-doc-btn");
+    
+    // Verificar se um arquivo foi selecionado
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      mostrarAlerta("Por favor, selecione um arquivo para upload.", "error");
+      return;
+    }
+    
+    // Obter o tipo de documento selecionado
+    const documentType = documentTypeSelect ? documentTypeSelect.value : "outros";
+    const file = fileInput.files[0];
+    
+    // Ativar flag para prevenir múltiplos uploads
+    isUploadingAdditionalDoc = true;
+    
+    // Atualizar UI para indicar processamento
+    const originalButtonText = uploadButton.innerHTML;
+    uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    uploadButton.disabled = true;
+    
+    try {
+      // Fazer upload do arquivo
+      const documentData = await uploadAdditionalDocument(currentOccurrence, file, documentType);
+      
+      // Salvar referência no banco de dados
+      const result = await saveAdditionalDocument(currentOccurrence, documentData);
+      
+      // Recarregar a lista de documentos adicionais
+      await refreshAdditionalDocumentsList();
+      
+      // Limpar o formulário
+      fileInput.value = "";
+      const uploadArea = document.querySelector(".upload-area-additional");
+      if (uploadArea) {
+        const iconElement = uploadArea.querySelector("i");
+        const textElement = uploadArea.querySelector("p");
+        
+        if (iconElement) iconElement.className = "fas fa-cloud-upload-alt";
+        if (textElement) textElement.textContent = "Clique para selecionar ou arraste o arquivo aqui";
+      }
+      
+      // Mostrar mensagem de sucesso
+      mostrarAlerta("Documento adicional anexado com sucesso!", "success");
+      
+    } catch (error) {
+      log(`Erro ao anexar documento adicional: ${error.message}`, "error", error);
+      mostrarAlerta(`Erro ao anexar documento: ${error.message}`, "error");
+    } finally {
+      // Restaurar estado do botão
+      uploadButton.innerHTML = originalButtonText;
+      uploadButton.disabled = false;
+      
+      // Desativar flag de upload
+      isUploadingAdditionalDoc = false;
+    }
+  }
+
+  /**
+   * Atualiza a lista de documentos adicionais
+   */
+  async function refreshAdditionalDocumentsList() {
+    if (!currentOccurrence) return;
+    
+    const documentsList = document.getElementById("additional-documents-list");
+    if (!documentsList) return;
+    
+    try {
+      // Mostrar loading
+      documentsList.innerHTML = '<p class="loading-docs"><i class="fas fa-spinner fa-spin"></i> Carregando documentos...</p>';
+      
+      // Carregar documentos adicionais
+      const documentos = await loadAdditionalDocuments(currentOccurrence);
+      
+      // Se não houver documentos, mostrar mensagem
+      if (documentos.length === 0) {
+        documentsList.innerHTML = '<p class="no-docs">Nenhum documento adicional anexado.</p>';
+        return;
+      }
+      
+      // Criar HTML para cada documento
+      let html = '';
+      
+      documentos.forEach(doc => {
+        // Determinar ícone com base no tipo de arquivo
+        let fileIcon = "file-alt";
+        if (doc.tipo.includes("pdf")) {
+          fileIcon = "file-pdf";
+        } else if (doc.tipo.includes("image")) {
+          fileIcon = "file-image";
+        } else if (doc.tipo.includes("word")) {
+          fileIcon = "file-word";
+        }
+        
+        // Formatar a data de upload
+        const dataUpload = new Date(doc.dataUpload);
+        const dataFormatada = dataUpload.toLocaleDateString() + ' ' + 
+                             dataUpload.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        // Obter o nome legível do tipo de documento
+        const tipoDocumentoNome = getTipoDocumentoNome(doc.tipoDocumento);
+        
+        html += `
+          <div class="additional-document-item" data-id="${doc.id}" data-path="${doc.path || ''}">
+            <div class="additional-document-icon">
+              <i class="fas fa-${fileIcon}"></i>
+            </div>
+            <div class="additional-document-info">
+              <p class="additional-document-name">${doc.nome}</p>
+              <p class="additional-document-type">Tipo: ${tipoDocumentoNome}</p>
+              <p class="additional-document-date">Anexado em: ${dataFormatada}</p>
+            </div>
+            <div class="additional-document-actions">
+              <a href="${doc.url}" target="_blank" class="document-action-btn view-btn" title="Visualizar">
+                <i class="fas fa-eye"></i>
+              </a>
+              <button class="document-action-btn remove-btn" title="Remover" data-id="${doc.id}" data-path="${doc.path || ''}">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      });
+      
+      // Atualizar a lista
+      documentsList.innerHTML = html;
+      
+      // Adicionar eventos para os botões de remover
+      const removeButtons = documentsList.querySelectorAll('.remove-btn');
+      removeButtons.forEach(btn => {
+        btn.addEventListener('click', handleRemoveAdditionalDocument);
+      });
+      
+    } catch (error) {
+      log(`Erro ao carregar documentos adicionais: ${error.message}`, "error", error);
+      documentsList.innerHTML = `<p class="error-docs"><i class="fas fa-exclamation-triangle"></i> Erro ao carregar documentos: ${error.message}</p>`;
+    }
+  }
+
+  /**
+   * Converte tipo de documento para nome legível
+   */
+  function getTipoDocumentoNome(tipo) {
+    const tipos = {
+      'identidade': 'Documento de Identidade',
+      'residencia': 'Comprovante de Residência',
+      'veiculo': 'Documento do Veículo',
+      'boletim': 'Boletim de Ocorrência',
+      'outros': 'Outros Documentos'
+    };
+    
+    return tipos[tipo] || 'Documento Adicional';
+  }
+
+  /**
+   * Manipula a remoção de um documento adicional
+   */
+  async function handleRemoveAdditionalDocument(event) {
+    if (!currentOccurrence) return;
+    
+    const button = event.currentTarget;
+    const documentId = button.getAttribute('data-id');
+    const storagePath = button.getAttribute('data-path');
+    
+    if (!documentId) {
+      mostrarAlerta("ID do documento não encontrado", "error");
+      return;
+    }
+    
+    // Pedir confirmação ao usuário
+    if (!confirm("Tem certeza que deseja remover este documento?")) {
+      return;
+    }
+    
+    try {
+      // Desabilitar o botão durante o processo
+      button.disabled = true;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      
+      // Remover o documento
+      await removeAdditionalDocument(currentOccurrence, documentId, storagePath);
+      
+      // Atualizar a lista
+      await refreshAdditionalDocumentsList();
+      
+      // Mostrar mensagem de sucesso
+      mostrarAlerta("Documento removido com sucesso!", "success");
+      
+    } catch (error) {
+      log(`Erro ao remover documento: ${error.message}`, "error", error);
+      mostrarAlerta(`Erro ao remover documento: ${error.message}`, "error");
+      
+      // Restaurar o botão em caso de erro
+      button.disabled = false;
+      button.innerHTML = '<i class="fas fa-trash-alt"></i>';
+    }
+  }
+
   // ===== FUNÇÕES DE INTERFACE =====
 
   /**
@@ -1125,12 +1702,60 @@ document.addEventListener("DOMContentLoaded", function () {
       `
           : ""
       }
+
+      <!-- Seção de Documentos Adicionais -->
+      <div class="modal-section" id="additional-documents-section">
+        <div class="section-title"><i class="fas fa-paperclip"></i> Documentos Adicionais</div>
+        
+        <!-- Lista de documentos adicionais já anexados -->
+        <div id="additional-documents-list" class="documents-list">
+          <!-- Será preenchido dinamicamente -->
+          <p class="no-docs">Nenhum documento adicional anexado.</p>
+        </div>
+        
+        <!-- Seção para anexar novo documento -->
+        <div class="add-document-section">
+          <h4>Anexar Documento Adicional</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="document-type">Tipo de Documento:</label>
+              <select id="document-type" class="document-type-select">
+                <option value="identidade">Documento de Identidade</option>
+                <option value="residencia">Comprovante de Residência</option>
+                <option value="veiculo">Documento do Veículo</option>
+                <option value="boletim">Boletim de Ocorrência</option>
+                <option value="outros">Outros Documentos</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="upload-area-additional">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>Clique para selecionar ou arraste o arquivo aqui</p>
+            <input type="file" id="additional-document-file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+          </div>
+          <small>Formatos aceitos: PDF, JPG, PNG, DOC, DOCX (máx. 10MB)</small>
+          
+          <!-- Container para informações do arquivo e progresso -->
+          <div id="additional-docs-progress"></div>
+          
+          <button id="upload-additional-doc-btn" class="btn btn-primary mt-3">
+            <i class="fas fa-upload"></i> Anexar Documento
+          </button>
+        </div>
+      </div>
     `;
 
       // Atualizar conteúdo do modal
       if (modalBody) {
         modalBody.innerHTML = html;
       }
+
+      // Inicializar interface de documentos adicionais
+      initializeAdditionalDocumentsUI();
+      
+      // Carregar documentos adicionais
+      await refreshAdditionalDocumentsList();
 
       // Ajustar visibilidade do container de upload
       const uploadContainer = document.getElementById(

@@ -5,6 +5,7 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/admin/(.*)", "destination": "/admin.html" }
+    { "source": "/admin/(.*)", "destination": "/admin.html" },
+    { "source": "/feedback", "destination": "/feedback.html" }
   ]
 }
