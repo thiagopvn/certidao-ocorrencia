@@ -49,6 +49,9 @@ exports.enviarEmailCertidaoV2 = onCall({
     subject: `Certidão de Ocorrência ${numeroOcorrencia} - Concluída`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
+        </div>
         <h2 style="color: #4caf50; text-align: center;">Certidão de Ocorrência Concluída</h2>
         
         <p>Olá, <strong>${nome}</strong>!</p>
@@ -74,6 +77,13 @@ exports.enviarEmailCertidaoV2 = onCall({
         </div>
       </div>
     `,
+    attachments: [
+      {
+        filename: 'bolachaGOCG.png',
+        path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
+        cid: 'bolachaGOCG' // ID referenciado no src da imagem
+      }
+    ]
   };
 
   try {
@@ -146,6 +156,9 @@ exports.enviarEmailAutomatico = onValueUpdated({
             subject: `Certidão de Ocorrência ${occurrenceId} - Concluída`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
+                </div>
                 <h2 style="color: #4caf50; text-align: center;">Certidão de Ocorrência Concluída</h2>
                 
                 <p>Olá, <strong>${dadosOcorrencia.nome}</strong>!</p>
@@ -171,6 +184,13 @@ exports.enviarEmailAutomatico = onValueUpdated({
                 </div>
               </div>
             `,
+            attachments: [
+              {
+                filename: 'bolachaGOCG.png',
+                path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
+                cid: 'bolachaGOCG' // ID referenciado no src da imagem
+              }
+            ]
           };
 
           // Enviar o e-mail
@@ -439,6 +459,9 @@ exports.enviarEmailConfirmacao = onCall({
     to: destinatario,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
+        </div>
         <h2 style="color: #3b82f6; text-align: center;">Solicitação Recebida com Sucesso</h2>
         
         <p>Olá, <strong>${nome}</strong>!</p>
@@ -459,7 +482,7 @@ exports.enviarEmailConfirmacao = onCall({
         
         <p>Você pode acompanhar o status da sua solicitação a qualquer momento em nosso site, utilizando seu CPF e o número de protocolo informado acima.</p>
         
-        <p>Caso tenha alguma dúvida, responda a este e-mail ou entre em contato com nosso conosco.</p>
+        <p>Caso tenha alguma dúvida, responda a este e-mail ou entre em contato conosco.</p>
         
         <p>Atenciosamente,</p>
         <p><strong>Grupamento Operacional do Comando Geral</strong></p>
@@ -469,6 +492,13 @@ exports.enviarEmailConfirmacao = onCall({
         </div>
       </div>
     `,
+    attachments: [
+      {
+        filename: 'bolachaGOCG.png',
+        path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
+        cid: 'bolachaGOCG' // ID referenciado no src da imagem
+      }
+    ]
   };
 
   try {
@@ -521,6 +551,9 @@ exports.enviarEmailNovaOcorrencia = onValueCreated({
         subject: `Confirmação de Solicitação - Protocolo ${occurrenceId}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
+            </div>
             <h2 style="color: #3b82f6; text-align: center;">Solicitação Recebida com Sucesso</h2>
             
             <p>Olá, <strong>${ocorrenciaData.nome}</strong>!</p>
@@ -551,6 +584,13 @@ exports.enviarEmailNovaOcorrencia = onValueCreated({
             </div>
           </div>
         `,
+        attachments: [
+          {
+            filename: 'bolachaGOCG.png',
+            path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
+            cid: 'bolachaGOCG' // ID referenciado no src da imagem
+          }
+        ]
       };
 
       // Enviar o e-mail
@@ -667,6 +707,9 @@ exports.enviarLembretesOcorrenciasPendentes = onSchedule({
           subject: `Lembrete: Solicitação ${ocorrencia.id} em Andamento`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
+              </div>
               <h2 style="color: #3b82f6; text-align: center;">Lembrete: Sua Solicitação Está em Andamento</h2>
               
               <p>Olá, <strong>${ocorrencia.nome}</strong>!</p>
@@ -677,7 +720,7 @@ exports.enviarLembretesOcorrenciasPendentes = onSchedule({
               
               <p>Você pode acompanhar o status da sua solicitação a qualquer momento em nosso site, utilizando seu CPF.</p>
               
-              <p>Caso tenha alguma dúvida, por favor, entre em contato com nosso conosco.</p>
+              <p>Caso tenha alguma dúvida, por favor, entre em contato conosco.</p>
               
               <p>Agradecemos sua paciência e compreensão.</p>
               
@@ -689,6 +732,13 @@ exports.enviarLembretesOcorrenciasPendentes = onSchedule({
               </div>
             </div>
           `,
+          attachments: [
+            {
+              filename: 'bolachaGOCG.png',
+              path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
+              cid: 'bolachaGOCG' // ID referenciado no src da imagem
+            }
+          ]
         };
 
         // Enviar o e-mail
@@ -883,39 +933,42 @@ exports.atualizarContadores = onValueWritten({
   }
 });
 
-// Função para enviar pesquisa de satisfação após certidão concluída (24h depois)
+// Função para enviar pesquisa de satisfação após certidão concluída (5 minutos depois)
 exports.enviarPesquisaSatisfacao = onSchedule({
-  schedule: "every hour",
+  schedule: "every 5 minutes",
   timeZone: "America/Sao_Paulo",
   region: "us-central1",
   secrets: [emailPass]
 }, async (context) => {
   try {
-    // Buscar ocorrências concluídas há 24 horas (com margem de 1 hora)
-    const vinteCincoHorasAtras = Date.now() - 25 * 60 * 60 * 1000;
-    const vinteUmaHorasAtras = Date.now() - 21 * 60 * 60 * 1000;
+    // Usar um intervalo de tempo mais amplo para garantir que pegue as ocorrências
+    const dezMinutosAtras = Date.now() - 10 * 60 * 1000;
+    const umMinutoAtras = Date.now() - 1 * 60 * 1000;
 
+    console.log(`Buscando ocorrências concluídas entre ${new Date(umMinutoAtras).toISOString()} e ${new Date(dezMinutosAtras).toISOString()}`);
+
+    // Modificar a consulta para primeiro verificar pelo status
     const snapshot = await getDatabase()
       .ref("/ocorrencias")
-      .orderByChild("dataAtualizacao")
-      .startAt(vinteCincoHorasAtras)
-      .endAt(vinteUmaHorasAtras)
+      .orderByChild("status")
+      .equalTo("Concluído")
       .once("value");
 
     if (!snapshot.exists()) {
-      console.log(
-        "Nenhuma ocorrência concluída recentemente para enviar pesquisa"
-      );
+      console.log("Nenhuma ocorrência com status 'Concluído' encontrada");
       return null;
     }
 
     const ocorrenciasConcluidas = [];
 
+    // Filtrar manualmente pelo intervalo de tempo
     snapshot.forEach((childSnapshot) => {
       const ocorrencia = childSnapshot.val();
-      // Verificar se a ocorrência está concluída, tem certidão e não recebeu pesquisa
+      // Verificar se foi atualizada nos últimos 10 minutos e não recebeu pesquisa
       if (
-        ocorrencia.status === "Concluído" &&
+        ocorrencia.dataAtualizacao && 
+        ocorrencia.dataAtualizacao >= dezMinutosAtras &&
+        ocorrencia.dataAtualizacao <= umMinutoAtras &&
         ocorrencia.certidao &&
         ocorrencia.certidao.url &&
         ocorrencia.email &&
@@ -928,14 +981,12 @@ exports.enviarPesquisaSatisfacao = onSchedule({
       }
     });
 
-    console.log(
-      `Encontradas ${ocorrenciasConcluidas.length} ocorrências para enviar pesquisa de satisfação`
-    );
+    console.log(`Encontradas ${ocorrenciasConcluidas.length} ocorrências para enviar pesquisa de satisfação`);
 
     // Enviar e-mails de pesquisa
     const envioPromises = ocorrenciasConcluidas.map(async (ocorrencia) => {
       try {
-        // URL fictícia para a pesquisa - substitua pela URL real
+        // URL para a pesquisa - USAR O ID CORRETO
         const urlPesquisa = `https://certidao-gocg.web.app/feedback?id=${ocorrencia.id}`;
 
         const mailOptions = {
@@ -943,34 +994,46 @@ exports.enviarPesquisaSatisfacao = onSchedule({
           to: ocorrencia.email,
           subject: `Pesquisa de Satisfação - Certidão ${ocorrencia.id}`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-              <h2 style="color: #3b82f6; text-align: center;">Sua Opinião é Importante para Nós</h2>
-              
-              <p>Olá, <strong>${ocorrencia.nome}</strong>!</p>
-              
-              <p>Gostaríamos de agradecer por utilizar nosso sistema de certidões de ocorrência. Esperamos que o processo tenha atendido às suas expectativas.</p>
-              
-              <p>Para continuarmos melhorando nossos serviços, gostaríamos de convidá-lo a participar de uma breve pesquisa de satisfação.</p>
-              
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${urlPesquisa}" 
-                   style="background-color: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                  Participar da Pesquisa
-                </a>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9f9f9; color: #333333;">
+              <div style="background-color: #4caf50; padding: 25px 30px; border-radius: 8px 8px 0 0;">
+                <h2 style="color: white; margin: 0; text-align: center; font-size: 24px;">Sua Opinião é Importante para Nós</h2>
               </div>
               
-              <p>A pesquisa levará menos de 2 minutos para ser preenchida e suas respostas são muito importantes para melhorarmos continuamente.</p>
+              <div style="padding: 30px; background-color: white; border-left: 1px solid #e1e1e1; border-right: 1px solid #e1e1e1;">
+                <p style="margin-top: 0; font-size: 16px;">Olá, <strong>${ocorrencia.nome}</strong>!</p>
+                
+                <p style="font-size: 16px;">Gostaríamos de agradecer por utilizar nosso sistema de certidões de ocorrência. Esperamos que o processo tenha atendido às suas expectativas.</p>
+                
+                <p style="font-size: 16px;">Para continuarmos melhorando nossos serviços, gostaríamos de convidá-lo a participar de uma breve pesquisa de satisfação.</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${urlPesquisa}" 
+                     style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">
+                    Participar da Pesquisa
+                  </a>
+                </div>
+                
+                <p style="font-size: 16px;">A pesquisa levará menos de 2 minutos para ser preenchida e suas respostas são muito importantes para melhorarmos continuamente.</p>
+                
+                <p style="font-size: 16px;">Agradecemos sua colaboração!</p>
+                
+                <p style="margin-bottom: 5px; font-size: 16px;">Atenciosamente,</p>
+                <p style="margin-top: 0; font-size: 16px;"><strong>Grupamento Operacional do Comando Geral</strong></p>
+              </div>
               
-              <p>Agradecemos sua colaboração!</p>
-              
-              <p>Atenciosamente,</p>
-              <p><strong>Grupamento Operacional do Comando Geral</strong></p>
-              
-              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-                <p>Este é um e-mail automático.</p>
+              <div style="background-color: #f5f5f5; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; border: 1px solid #e1e1e1; border-top: none;">
+                <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 120px; height: auto; margin-bottom: 15px;" />
+                <p style="margin: 0; font-size: 13px; color: #666666;">Este é um e-mail automático. Por favor, não responda.</p>
               </div>
             </div>
           `,
+          attachments: [
+            {
+              filename: 'bolachaGOCG.png',
+              path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
+              cid: 'bolachaGOCG' // ID referenciado no src da imagem
+            }
+          ]
         };
 
         // Enviar o e-mail
@@ -1023,7 +1086,7 @@ exports.enviarPesquisaSatisfacao = onSchedule({
     return { success: false, error: error.message };
   }
 });
-
+      
 // Função para upload de certidão
 exports.uploadCertidao = onCall({
   cors: true, // Habilita CORS para todas as origens
@@ -1101,6 +1164,9 @@ exports.reenviarEmailCertidao = onCall({
       subject: `Certidão de Ocorrência ${occurrenceId} - Concluída`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
+          </div>
           <h2 style="color: #4caf50; text-align: center;">Certidão de Ocorrência Concluída</h2>
           
           <p>Olá, <strong>${ocorrencia.nome}</strong>!</p>
@@ -1126,6 +1192,13 @@ exports.reenviarEmailCertidao = onCall({
           </div>
         </div>
       `,
+      attachments: [
+        {
+          filename: 'bolachaGOCG.png',
+          path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
+          cid: 'bolachaGOCG' // ID referenciado no src da imagem
+        }
+      ]
     };
     
     // Enviar o e-mail
