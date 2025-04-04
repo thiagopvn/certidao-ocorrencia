@@ -125,6 +125,36 @@ document.addEventListener("DOMContentLoaded", function () {
         datasolicitacaoError.style.display = "none";
       }
 
+      // Verificação de campos obrigatórios
+      const requiredInputs = formulario.querySelectorAll('[required]');
+      let hasEmptyRequired = false;
+
+      // Verificando inputs obrigatórios (exceto document do carro, que não tem mais o required)
+      requiredInputs.forEach(input => {
+        if (input.type === 'file') {
+          // Para inputs de arquivo, verificar se tem arquivos selecionados
+          if (!input.files || input.files.length === 0) {
+            hasEmptyRequired = true;
+            // Destacar visualmente
+            const fileArea = input.closest('.file-upload-area');
+            if (fileArea) {
+              fileArea.style.borderColor = 'var(--danger-color)';
+            }
+          }
+        } else if (!input.value.trim()) {
+          hasEmptyRequired = true;
+          input.style.borderColor = 'var(--danger-color)';
+        }
+      });
+
+      if (hasEmptyRequired) {
+        showErrorMessage(
+          "Campos obrigatórios não preenchidos",
+          "Por favor, preencha todos os campos obrigatórios destacados em vermelho."
+        );
+        return;
+      }
+
       // Ativa flag de envio
       isSubmitting = true;
 
