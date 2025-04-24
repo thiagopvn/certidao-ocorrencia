@@ -1332,71 +1332,105 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   /**
-   * Calcula estatísticas das ocorrências
-   */
-  function calcularEstatisticas(ocorrencias) {
-    const agora = new Date();
-    const inicioMes = new Date(
-      agora.getFullYear(),
-      agora.getMonth(),
-      1
-    ).getTime();
+ /**
+ * Calcula estatísticas das ocorrências
+ */
+function calcularEstatisticas(ocorrencias) {
+  const agora = new Date();
+  const inicioMes = new Date(
+    agora.getFullYear(),
+    agora.getMonth(),
+    1
+  ).getTime();
 
-    const stats = {
-      pendentes: 0,
-      concluidas: 0,
-      canceladas: 0,
-      emAnalise: 0,
-      total: ocorrencias.length,
-      mes: 0,
-    };
+  const stats = {
+    pendentes: 0,
+    concluidas: 0,
+    canceladas: 0,
+    emAndamento: 0, // Renomeado de emAnalise para emAndamento
+    total: ocorrencias.length,
+    mes: 0,
+  };
 
-    ocorrencias.forEach((ocorrencia) => {
-      if (ocorrencia.status === "Pendente") {
-        stats.pendentes++;
-      } else if (ocorrencia.status === "Concluído") {
-        stats.concluidas++;
-      } else if (ocorrencia.status === "Cancelado") {
-        stats.canceladas++;
-      } else if (ocorrencia.status === "Em Análise") {
-        stats.emAnalise++;
-      }
-
-      // Contar ocorrências do mês atual
-      if (ocorrencia.timestamp >= inicioMes) {
-        stats.mes++;
-      }
-    });
-
-    return stats;
-  }
-
-  /**
-   * Atualiza a UI com as estatísticas
-   */
-  function atualizarEstatisticasUI(stats) {
-    // Atualizar contadores na UI
-    if (pendingCount) pendingCount.textContent = stats.pendentes;
-    if (completedCount) completedCount.textContent = stats.concluidas;
-
-    // Atualizar estatísticas detalhadas
-    if (statsTotal) statsTotal.textContent = stats.total;
-    if (statsMonth) statsMonth.textContent = stats.mes;
-    if (statsPending) statsPending.textContent = stats.pendentes;
-    if (statsCompleted) statsCompleted.textContent = stats.concluidas;
-
-    // Calcular percentual de concluídas (para mostrar tendência)
-    const percentConcluidas =
-      stats.total > 0 ? Math.round((stats.concluidas / stats.total) * 100) : 0;
-
-    const statsCompletedPercent = document.getElementById(
-      "stats-completed-percent"
-    );
-    if (statsCompletedPercent) {
-      statsCompletedPercent.textContent = `${percentConcluidas}%`;
+  ocorrencias.forEach((ocorrencia) => {
+    if (ocorrencia.status === "Pendente") {
+      stats.pendentes++;
+    } else if (ocorrencia.status === "Concluído") {
+      stats.concluidas++;
+    } else if (ocorrencia.status === "Cancelado") {
+      stats.canceladas++;
+    } else if (ocorrencia.status === "Em andamento") { // Alterado de "Em Análise" para "Em andamento"
+      stats.emAndamento++;
     }
-  }
 
+    // Contar ocorrências do mês atual
+    if (ocorrencia.timestamp >= inicioMes) {
+      stats.mes++;
+    }
+  });
+
+  return stats;
+}
+  /**
+   /**
+ * Atualiza a UI com as estatísticas
+ */
+function atualizarEstatisticasUI(stats) {
+  // Atualizar contadores na UI
+  if (pendingCount) pendingCount.textContent = stats.pendentes;
+  if (completedCount) completedCount.textContent = stats.concluidas;
+  
+  // Novo: referência ao contador de "Em andamento" (se existir no HTML)
+  const inProgressCount = document.getElementById("inprogress-count");
+  if (inProgressCount) inProgressCount.textContent = stats.emAndamento;
+  
+  // Novo: referência ao contador de "Cancelado" (se existir no HTML)
+  const canceledCount = document.getElementById("canceled-count");
+  if (canceledCount) canceledCount.textContent = stats.canceladas;
+
+  // Atualizar estatísticas detalhadas
+  if (statsTotal) statsTotal.textContent = stats.total;
+  if (statsMonth) statsMonth.textContent = stats.mes;
+  if (statsPending) statsPending.textContent = stats.pendentes;
+  if (statsCompleted) statsCompleted.textContent = stats.concluidas;
+  
+  // Novo: estatísticas detalhadas para "Em andamento" e "Cancelado"
+  const statsInProgress = document.getElementById("stats-inprogress");
+  if (statsInProgress) statsInProgress.textContent = stats.emAndamento;
+  
+  const statsCanceled = document.getElementById("stats-canceled");
+  if (statsCanceled) statsCanceled.textContent = stats.canceladas;
+
+  // Calcular percentual de concluídas (para mostrar tendência)
+  const percentConcluidas =
+    stats.total > 0 ? Math.round((stats.concluidas / stats.total) * 100) : 0;
+
+  const statsCompletedPercent = document.getElementById(
+    "stats-completed-percent"
+  );
+  if (statsCompletedPercent) {
+    statsCompletedPercent.textContent = `${percentConcluidas}%`;
+  }
+  
+  // Novo: Opcionalmente calcular percentuais para outros status
+  // Percentual de "Em andamento"
+  const percentEmAndamento = 
+    stats.total > 0 ? Math.round((stats.emAndamento / stats.total) * 100) : 0;
+    
+  const statsInProgressPercent = document.getElementById("stats-inprogress-percent");
+  if (statsInProgressPercent) {
+    statsInProgressPercent.textContent = `${percentEmAndamento}%`;
+  }
+  
+  // Percentual de "Cancelado"
+  const percentCanceladas = 
+    stats.total > 0 ? Math.round((stats.canceladas / stats.total) * 100) : 0;
+    
+  const statsCanceledPercent = document.getElementById("stats-canceled-percent");
+  if (statsCanceledPercent) {
+    statsCanceledPercent.textContent = `${percentCanceladas}%`;
+  }
+}
   /**
    * Carrega dados para uma aba específica
    */
