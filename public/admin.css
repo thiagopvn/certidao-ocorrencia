@@ -2196,3 +2196,23 @@ body {
     align-self: flex-end;
   }
 }
+
+/* Status "Em andamento" */
+.ocorrencia-card.status-em-andamento {
+  border-left-color: var(--info);
+}
+
+.ocorrencia-status.em-andamento {
+  background-color: var(--info-light);
+  color: var(--info-dark);
+}
+
+/* Status "Cancelado" */
+.ocorrencia-card.status-cancelado {
+  border-left-color: var(--danger);
+}
+
+.ocorrencia-status.cancelado {
+  background-color: var(--danger-light);
+  color: var(--danger-dark);
+}
