@@ -98,10 +98,20 @@
                 <span>Pendentes</span>
                 <div class="badge" id="pending-count">0</div>
               </a>
+              <a class="nav-item" data-tab="inprogress">
+                <i class="fas fa-spinner"></i>
+                <span>Em andamento</span>
+                <div class="badge" id="inprogress-count">0</div>
+              </a>
               <a class="nav-item" data-tab="completed">
                 <i class="fas fa-check-circle"></i>
                 <span>Concluídos</span>
                 <div class="badge" id="completed-count">0</div>
+              </a>
+              <a class="nav-item" data-tab="canceled">
+                <i class="fas fa-ban"></i>
+                <span>Cancelados</span>
+                <div class="badge" id="canceled-count">0</div>
               </a>
               <a class="nav-item" data-tab="all">
                 <i class="fas fa-list"></i>
@@ -173,6 +183,17 @@
                 </div>
               </div>
 
+              <!-- Nova estatística para Em andamento -->
+              <div class="stat-card info">
+                <div class="stat-icon">
+                  <i class="fas fa-spinner"></i>
+                </div>
+                <div class="stat-data">
+                  <div class="stat-value" id="stats-inprogress">0</div>
+                  <div class="stat-label">Em andamento</div>
+                </div>
+              </div>
+
               <div class="stat-card success">
                 <div class="stat-icon">
                   <i class="fas fa-check-circle"></i>
@@ -184,6 +205,17 @@
                 <div class="stat-trend up">
                   <i class="fas fa-arrow-up"></i>
                   <span id="stats-completed-percent">0%</span>
+                </div>
+              </div>
+
+              <!-- Nova estatística para Cancelados -->
+              <div class="stat-card danger">
+                <div class="stat-icon">
+                  <i class="fas fa-ban"></i>
+                </div>
+                <div class="stat-data">
+                  <div class="stat-value" id="stats-canceled">0</div>
+                  <div class="stat-label">Canceladas</div>
                 </div>
               </div>
 
@@ -234,6 +266,18 @@
               </div>
             </div>
 
+            <!-- Nova Aba de Solicitações Em andamento -->
+            <div class="tab-content" id="inprogress-tab" style="display: none">
+              <div class="solicitacoes-container">
+                <h2>
+                  <i class="fas fa-spinner"></i> Solicitações Em andamento
+                </h2>
+                <div class="ocorrencias-grid" id="inprogress-ocorrencias">
+                  <!-- Conteúdo será carregado dinamicamente -->
+                </div>
+              </div>
+            </div>
+
             <!-- Aba de Solicitações Concluídas -->
             <div class="tab-content" id="completed-tab" style="display: none">
               <div class="solicitacoes-container">
@@ -241,6 +285,18 @@
                   <i class="fas fa-check-circle"></i> Solicitações Concluídas
                 </h2>
                 <div class="ocorrencias-grid" id="completed-ocorrencias">
+                  <!-- Conteúdo será carregado dinamicamente -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Nova Aba de Solicitações Canceladas -->
+            <div class="tab-content" id="canceled-tab" style="display: none">
+              <div class="solicitacoes-container">
+                <h2>
+                  <i class="fas fa-ban"></i> Solicitações Canceladas
+                </h2>
+                <div class="ocorrencias-grid" id="canceled-ocorrencias">
                   <!-- Conteúdo será carregado dinamicamente -->
                 </div>
               </div>
@@ -288,10 +344,12 @@
           </div>
 
           <div class="status-update">
-            <!-- MODIFICAÇÃO: Manter apenas Pendente e Concluído -->
+            <!-- Modificação: Adicionar opções "Em andamento" e "Cancelado" -->
             <select id="status-select">
               <option value="Pendente">Pendente</option>
+              <option value="Em andamento">Em andamento</option>
               <option value="Concluído">Concluído</option>
+              <option value="Cancelado">Cancelado</option>
             </select>
             <button id="update-status-btn" class="btn btn-primary">
               <i class="fas fa-save"></i> Atualizar Status
