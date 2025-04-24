@@ -1432,56 +1432,91 @@ function atualizarEstatisticasUI(stats) {
   }
 }
   /**
-   * Carrega dados para uma aba específica
-   */
-  async function carregarDadosAba(tabId) {
-    try {
-      // Identificar o container correspondente à aba
-      const containerId = `${tabId}-ocorrencias`;
-      const container = document.getElementById(containerId);
+ /**
+ * Carrega dados para uma aba específica
+ */
+async function carregarDadosAba(tabId) {
+  try {
+    // Identificar o container correspondente à aba
+    const containerId = `${tabId}-ocorrencias`;
+    const container = document.getElementById(containerId);
 
-      if (!container) {
-        console.error(`Container não encontrado: ${containerId}`);
-        return;
-      }
-
-      // Mostrar loading
-      mostrarLoading(container, `Carregando solicitações...`);
-
-      // Carregar ocorrências
-      const ocorrencias = await carregarOcorrencias();
-
-      // Filtrar ocorrências conforme a aba
-      let ocorrenciasFiltradas = [];
-
-      if (tabId === "pending") {
-        ocorrenciasFiltradas = ocorrencias.filter(
-          (o) => o.status === "Pendente"
-        );
-      } else if (tabId === "completed") {
-        ocorrenciasFiltradas = ocorrencias.filter(
-          (o) => o.status === "Concluído"
-        );
-      } else if (tabId === "all") {
-        ocorrenciasFiltradas = ocorrencias;
-      }
-
-      // Ordenar por data (mais recentes primeiro)
-      ocorrenciasFiltradas.sort((a, b) => b.timestamp - a.timestamp);
-
-      // Renderizar ocorrências
-      renderizarOcorrencias(container, ocorrenciasFiltradas);
-
-      return ocorrenciasFiltradas;
-    } catch (error) {
-      log(
-        `Erro ao carregar dados para aba ${tabId}: ${error.message}`,
-        "error",
-        error
-      );
-      mostrarAlerta(`Erro ao carregar dados: ${error.message}`, "error");
+    if (!container) {
+      console.error(`Container não encontrado: ${containerId}`);
+      return;
     }
+
+    // Mostrar loading
+    mostrarLoading(container, `Carregando solicitações...`);
+
+    // Carregar ocorrências
+    const ocorrencias = await carregarOcorrencias();
+
+    // Filtrar ocorrências conforme a aba
+    let ocorrenciasFiltradas = [];
+
+    if (tabId === "pending") {
+      ocorrenciasFiltradas = ocorrencias.filter(
+        (o) => o.status === "Pendente"
+      );
+    } else if (tabId === "inprogress") {
+      ocorrenciasFiltradas = ocorrencias.filter(
+        (o) => o.status === "Em andamento"
+      );
+    } else if (tabId === "completed") {
+      ocorrenciasFiltradas = ocorrencias.filter(
+        (o) => o.status === "Concluído"
+      );
+    } else if (tabId === "canceled") {
+      ocorrenciasFiltradas = ocorrencias.filter(
+        (o) => o.status === "Cancelado"
+      );
+    } else if (tabId === "all") {
+      ocorrenciasFiltradas = ocorrencias;
+    }
+
+    // Ordenar por data (mais recentes primeiro)
+    ocorrenciasFiltradas.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Renderizar ocorrências
+    renderizarOcorrencias(container, ocorrenciasFiltradas);
+
+    // Atualizar título da aba
+    const currentTabTitle = document.getElementById("current-tab-title");
+    if (currentTabTitle) {
+      let tabIcon = "list";
+      let tabTitle = "Solicitações";
+      
+      if (tabId === "pending") {
+        tabIcon = "clock";
+        tabTitle = "Solicitações Pendentes";
+      } else if (tabId === "inprogress") {
+        tabIcon = "spinner";
+        tabTitle = "Solicitações Em andamento";
+      } else if (tabId === "completed") {
+        tabIcon = "check-circle";
+        tabTitle = "Solicitações Concluídas";
+      } else if (tabId === "canceled") {
+        tabIcon = "ban";
+        tabTitle = "Solicitações Canceladas";
+      } else if (tabId === "all") {
+        tabIcon = "list";
+        tabTitle = "Todas as Solicitações";
+      }
+      
+      currentTabTitle.innerHTML = `<i class="fas fa-${tabIcon}"></i> ${tabTitle}`;
+    }
+
+    return ocorrenciasFiltradas;
+  } catch (error) {
+    log(
+      `Erro ao carregar dados para aba ${tabId}: ${error.message}`,
+      "error",
+      error
+    );
+    mostrarAlerta(`Erro ao carregar dados: ${error.message}`, "error");
   }
+}
 
   /**
    * Renderiza lista de ocorrências em um container
