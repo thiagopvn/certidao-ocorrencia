@@ -435,7 +435,21 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Funções de notificação
+  
+  // Função para remover modais existentes
+  function removeExistingModals() {
+    const existingModals = document.querySelectorAll('.success-modal-overlay, .error-modal-overlay');
+    existingModals.forEach(modal => {
+      if (modal.parentNode) {
+        modal.parentNode.removeChild(modal);
+      }
+    });
+  }
+  
   function showSuccessMessage(title, message) {
+    // Remover qualquer modal existente primeiro
+    removeExistingModals();
+    
     // Criar modal de sucesso
     const modalHTML = `
       <div class="success-modal-overlay">
@@ -684,6 +698,9 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function showErrorMessage(title, message) {
+    // Remover qualquer modal existente primeiro
+    removeExistingModals();
+    
     // Criar modal de erro
     const modalHTML = `
       <div class="error-modal-overlay">
