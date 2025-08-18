@@ -252,6 +252,128 @@ exports.enviarEmailAutomatico = onValueUpdated({
   return null;
 });
 
+// Trigger para enviar e-mail quando certidão é atualizada
+exports.enviarEmailCertidaoAtualizada = onValueUpdated({
+  ref: "/ocorrencias/{occurrenceId}/certidao",
+  region: "us-central1",
+  secrets: [emailPass]
+}, async (event) => {
+  const occurrenceId = event.params.occurrenceId;
+  const certidaoAnterior = event.data.before?.val() || null;
+  const novaCertidao = event.data.after?.val() || null;
+  
+  console.log(`enviarEmailCertidaoAtualizada: Certidão da ocorrência ${occurrenceId} foi atualizada`);
+  
+  // Verificar se há uma nova certidão (URL diferente ou nova certidão onde não havia antes)
+  if (novaCertidao && novaCertidao.url) {
+    const urlMudou = !certidaoAnterior || certidaoAnterior.url !== novaCertidao.url;
+    
+    if (urlMudou) {
+      console.log(`Nova certidão detectada para ocorrência ${occurrenceId}, preparando envio de e-mail`);
+      
+      // Buscar os dados completos da ocorrência
+      const snapshot = await getDatabase()
+        .ref(`/ocorrencias/${occurrenceId}`)
+        .once("value");
+      
+      const dadosOcorrencia = snapshot.val();
+      
+      // Verificar se o status é "Concluído" e há email disponível
+      if (dadosOcorrencia && 
+          dadosOcorrencia.status === "Concluído" &&
+          dadosOcorrencia.email) {
+        
+        try {
+          console.log(`Enviando e-mail atualizado para ${dadosOcorrencia.email} com nova certidão: ${novaCertidao.url}`);
+          
+          const mailOptions = {
+            from: '"Sistema de Certidões" <gocg.certidao@gmail.com>',
+            to: dadosOcorrencia.email,
+            subject: `Certidão de Ocorrência ${occurrenceId} - Atualizada`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background-color: #2c3e50; color: white; padding: 20px; text-align: center;">
+                  <h1 style="margin: 0;">Sistema de Certidões - GOCG</h1>
+                </div>
+                <div style="padding: 20px; background-color: #f8f9fa;">
+                  <h2 style="color: #2c3e50;">Olá ${dadosOcorrencia.nome},</h2>
+                  <p style="color: #333; line-height: 1.6;">Sua certidão de ocorrência foi <strong>atualizada</strong>.</p>
+                  <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Número da Ocorrência:</strong> ${occurrenceId}</p>
+                    <p style="margin: 5px 0;"><strong>Status:</strong> <span style="color: #27ae60;">Concluído</span></p>
+                    <p style="margin: 5px 0;"><strong>Data de Atualização:</strong> ${new Date().toLocaleDateString("pt-BR")}</p>
+                  </div>
+                  <p style="color: #333; line-height: 1.6;">
+                    <strong>Uma nova versão da sua certidão está disponível.</strong> 
+                    Por favor, utilize o link abaixo para acessar o documento atualizado:
+                  </p>
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${novaCertidao.url}" 
+                       style="background-color: #27ae60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                      Baixar Certidão Atualizada
+                    </a>
+                  </div>
+                  <p style="color: #666; font-size: 14px; line-height: 1.6;">
+                    <strong>Importante:</strong> Esta é a versão mais recente da sua certidão. 
+                    Versões anteriores podem estar desatualizadas.
+                  </p>
+                </div>
+                <div style="background-color: #2c3e50; color: white; padding: 15px; text-align: center; font-size: 12px;">
+                  <p style="margin: 5px 0;">Grupamento Operacional do Comando Geral - GOCG</p>
+                  <p style="margin: 5px 0;">Este é um e-mail automático, por favor não responda.</p>
+                </div>
+              </div>
+            `,
+            attachments: [
+              {
+                filename: "bolachaGOCG.png",
+                path: "./bolachaGOCG.png",
+                cid: "logo",
+              },
+            ],
+          };
+          
+          const transporter = await getTransporter();
+          await transporter.sendMail(mailOptions);
+          
+          console.log(`E-mail com certidão atualizada enviado com sucesso para ${dadosOcorrencia.email}`);
+          
+          // Registrar o envio do e-mail atualizado
+          await getDatabase()
+            .ref(`ocorrencias/${occurrenceId}/emailCertidaoAtualizada`)
+            .set({
+              success: true,
+              timestamp: ServerValue.TIMESTAMP,
+              certidaoUrl: novaCertidao.url
+            });
+          
+          return { success: true };
+          
+        } catch (error) {
+          console.error("Erro ao enviar e-mail com certidão atualizada:", error);
+          
+          // Registrar o erro
+          await getDatabase()
+            .ref(`ocorrencias/${occurrenceId}/emailCertidaoAtualizada`)
+            .set({
+              success: false,
+              timestamp: ServerValue.TIMESTAMP,
+              error: error.message
+            });
+          
+          return { success: false, error: error.message };
+        }
+      } else {
+        console.log(`Ocorrência ${occurrenceId} não está concluída ou não tem email. Status: ${dadosOcorrencia?.status}, Email: ${!!dadosOcorrencia?.email}`);
+      }
+    } else {
+      console.log(`URL da certidão não mudou para ocorrência ${occurrenceId}, não é necessário reenviar e-mail`);
+    }
+  }
+  
+  return null;
+});
+
 // Função para registrar notificações para administradores
 exports.notificarStatusAtualizado = onValueUpdated({
   ref: "/ocorrencias/{occurrenceId}/status",

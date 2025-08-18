@@ -11,7 +11,7 @@ This is a **Certificate of Occurrence Request System** (Sistema de Certidão de 
 ### Frontend
 - **Static HTML/CSS/JavaScript** hosted on Firebase Hosting
 - **Vanilla JavaScript** with Firebase SDK v8 (no frontend frameworks)
-- **Two main interfaces:**
+- **Main interfaces:**
   - `public/index.html` - Citizen-facing form for submitting requests and checking status
   - `public/admin.html` - Administrative interface for managing requests
   - `public/feedback.html` - Satisfaction survey page
@@ -74,6 +74,8 @@ firebase serve
 - `uploadCertidao` - Handles certificate file uploads
 - `reenviarEmailCertidao` - Manual resend of certificate emails
 - `marcarNotificacaoLida` - Mark admin notifications as read
+- `enviarEmailCertidaoV2` - Manual email sending with certificate
+- `enviarEmailConfirmacao` - Manual confirmation email sending
 
 ### Automated Maintenance
 - `limparNotificacoesAntigas` - Monthly cleanup of old notifications
@@ -100,14 +102,22 @@ firebase serve
 
 /contadores
   - Pendente, Concluído, total: status counters
+
+/relatorios/{year}/{month}
+  - Monthly report data
+
+/backups/{date}
+  - Weekly backup snapshots
 ```
 
-## Security Features
+## Security Considerations
 
-- **CPF-based access control** - Users can only view their own requests
+- **CPF-based access control** - Users can only view their own requests (client-side filtering)
 - **Firebase Authentication** for admin access
 - **CORS configuration** in `cors.json`
 - **Environment variables** for sensitive data (email credentials)
+
+⚠️ **Important:** Security rules are not implemented on the database level. Access control relies on client-side filtering.
 
 ## Email Configuration
 
@@ -117,43 +127,29 @@ Email sending uses Gmail SMTP via Nodemailer:
 - **Templates:** HTML email templates with GOCG branding
 - **Attachments:** Includes GOCG logo (`bolachaGOCG.png`)
 
+### Setting Environment Variables
+```bash
+firebase functions:config:set email.user="gocg.certidao@gmail.com"
+firebase functions:config:set email.pass="your-app-password"
+```
+
 ## Common Development Tasks
 
-### Adding New Email Templates
-1. Modify the relevant function in `functions/index.js`
-2. Update HTML template with GOCG styling
-3. Test with Firebase emulator before deploying
+### Testing Functions Locally
+```bash
+cd functions
+firebase emulators:start --only functions
+```
 
 ### Debugging Email Issues
 - Check function logs: `firebase functions:log`
 - Verify email credentials in Firebase environment
 - Test email delivery in functions emulator
 
-### Database Queries
-- All queries use Firebase Realtime Database syntax
-- Security relies on client-side CPF filtering (not server-side rules)
-- Status filtering is handled in frontend JavaScript
-
 ### File Upload Process
 1. Files uploaded to Firebase Storage with path: `/ocorrencias/{id}/{type}/{filename}`
 2. Download URLs stored in database under `documentos` object
 3. Admin certificate uploads use signed URLs via `uploadCertidao` function
-
-## Environment Setup
-
-### Required Firebase Services
-- Authentication (for admin login)
-- Realtime Database (for data storage)
-- Storage (for document uploads)
-- Functions (for backend logic)
-- Hosting (for web interface)
-
-### Email Configuration
-Set Firebase environment variables:
-```bash
-firebase functions:config:set email.user="gocg.certidao@gmail.com"
-firebase functions:config:set email.pass="your-app-password"
-```
 
 ## Deployment Notes
 
@@ -161,3 +157,4 @@ firebase functions:config:set email.pass="your-app-password"
 - Functions deployed from `functions/` directory
 - Static assets include Firebase SDK v8 (CDN-hosted)
 - CORS configuration allows all origins (consider restricting for production)
+- Node.js version: 18 (specified in functions/package.json)
