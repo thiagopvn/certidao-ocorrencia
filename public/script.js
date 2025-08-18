@@ -475,7 +475,7 @@ document.addEventListener("DOMContentLoaded", function () {
             ${message}
             <div class="auto-reload-info">
               <i class="fas fa-info-circle"></i>
-              <small>Esta página será recarregada automaticamente em <span class="countdown">10</span> segundos ou clique em OK para continuar.</small>
+              <small>Esta página será recarregada automaticamente em <span class="countdown">60</span> segundos ou clique em OK para continuar.</small>
             </div>
           </div>
           <div class="success-modal-footer">
@@ -674,7 +674,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Contador regressivo e auto-reload
-    let countdown = 10;
+    let countdown = 60;
     const countdownElement = modalElement.querySelector('.countdown');
     
     const countdownInterval = setInterval(() => {
