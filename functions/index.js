@@ -146,106 +146,127 @@ exports.enviarEmailAutomatico = onValueUpdated({
 
   console.log(`enviarEmailAutomatico: Status da ocorrência ${occurrenceId} alterado de "${statusAnterior}" para "${novoStatus}"`);
 
-  // Verificar se o status mudou para "Concluído"
+  // CONDIÇÃO PRINCIPAL: Verificar transição de status
+  // Email é enviado SEMPRE que o status muda de qualquer coisa diferente de "Concluído" para "Concluído"
   if (statusAnterior !== "Concluído" && novoStatus === "Concluído") {
-    console.log(`Status da ocorrência ${occurrenceId} alterado para Concluído, verificando dados para envio de e-mail`);
+    console.log(`Status da ocorrência ${occurrenceId} alterado para Concluído, preparando envio de e-mail`);
 
-    // Buscar os dados completos e atualizados da ocorrência para garantir que temos os dados mais recentes
+    // Buscar os dados completos e atualizados da ocorrência
     const snapshot = await getDatabase()
       .ref(`/ocorrencias/${occurrenceId}`)
       .once("value");
     
     const dadosOcorrencia = snapshot.val();
 
-    // Verificar novamente se há certidão e email disponíveis com os dados atualizados
+    // Verificar se há certidão e email disponíveis
     if (dadosOcorrencia && 
         dadosOcorrencia.email && 
         dadosOcorrencia.certidao && 
         dadosOcorrencia.certidao.url) {
       
-      // Verificar se já enviamos um email com sucesso anteriormente
-      const naoEnviouEmail = !dadosOcorrencia.emailEnviado || !dadosOcorrencia.emailEnviado.success;
-      
-      if (naoEnviouEmail) {
-        try {
-          console.log(`Preparando para enviar e-mail para ${dadosOcorrencia.email} com certificado: ${dadosOcorrencia.certidao.url}`);
-          
-          const mailOptions = {
-            from: '"Sistema de Certidões" <gocg.certidao@gmail.com>',
-            to: dadosOcorrencia.email,
-            subject: `Certidão de Ocorrência ${occurrenceId} - Concluída`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                <div style="text-align: center; margin-bottom: 20px;">
-                  <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
-                </div>
-                <h2 style="color: #4caf50; text-align: center;">Certidão de Ocorrência Concluída</h2>
-                
-                <p>Olá, <strong>${dadosOcorrencia.nome}</strong>!</p>
-                
-                <p>Temos o prazer de informar que sua solicitação de certidão de ocorrência <strong>${occurrenceId}</strong> foi concluída com sucesso.</p>
-                
-                <p>Você pode acessar sua certidão através do link abaixo:</p>
-                
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="${dadosOcorrencia.certidao.url}" 
-                     style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                    Baixar Certidão
-                  </a>
-                </div>
-                
-                <p>Se você tiver alguma dúvida ou precisar de assistência adicional, não hesite em nos contatar.</p>
-                
-                <p>Atenciosamente,</p>
-                <p><strong>Grupamento Operacional do Comando Geral</strong></p>
-                
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
-                  <p>Este é um e-mail automático.</p>
-                </div>
+      // REMOVIDA A VERIFICAÇÃO DE FLAG - Email será enviado SEMPRE que a condição de transição for atendida
+      try {
+        console.log(`Enviando e-mail para ${dadosOcorrencia.email} com certificado: ${dadosOcorrencia.certidao.url}`);
+        
+        const mailOptions = {
+          from: '"Sistema de Certidões" <gocg.certidao@gmail.com>',
+          to: dadosOcorrencia.email,
+          subject: `Certidão de Ocorrência ${occurrenceId} - Concluída`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <img src="cid:bolachaGOCG" alt="GOCG" style="max-width: 150px; height: auto;" />
               </div>
-            `,
-            attachments: [
-              {
-                filename: 'bolachaGOCG.png',
-                path: './bolachaGOCG.png', // Caminho relativo ao arquivo na pasta functions
-                cid: 'bolachaGOCG' // ID referenciado no src da imagem
-              }
-            ]
-          };
+              <h2 style="color: #4caf50; text-align: center;">Certidão de Ocorrência Concluída</h2>
+              
+              <p>Olá, <strong>${dadosOcorrencia.nome}</strong>!</p>
+              
+              <p>Temos o prazer de informar que sua solicitação de certidão de ocorrência <strong>${occurrenceId}</strong> foi concluída com sucesso.</p>
+              
+              <p>Você pode acessar sua certidão através do link abaixo:</p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${dadosOcorrencia.certidao.url}" 
+                   style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                  Baixar Certidão
+                </a>
+              </div>
+              
+              <p>Se você tiver alguma dúvida ou precisar de assistência adicional, não hesite em nos contatar.</p>
+              
+              <p>Atenciosamente,</p>
+              <p><strong>Grupamento Operacional do Comando Geral</strong></p>
+              
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777; text-align: center;">
+                <p>Este é um e-mail automático.</p>
+              </div>
+            </div>
+          `,
+          attachments: [
+            {
+              filename: 'bolachaGOCG.png',
+              path: './bolachaGOCG.png',
+              cid: 'bolachaGOCG'
+            }
+          ]
+        };
 
-          // Enviar o e-mail
-          const transporter = getTransporter();
-          await transporter.sendMail(mailOptions);
+        // Enviar o e-mail
+        const transporter = getTransporter();
+        await transporter.sendMail(mailOptions);
 
-          // Registrar o envio no banco de dados
-          await getDatabase()
-            .ref(`ocorrencias/${occurrenceId}/emailEnviado`)
-            .set({
-              timestamp: ServerValue.TIMESTAMP,
-              success: true,
-            });
+        // NOVO: Registrar o envio em um LOG auditável (não como flag única)
+        // Cada envio é registrado com timestamp, criando um histórico completo
+        await getDatabase()
+          .ref(`ocorrencias/${occurrenceId}/emailLogs`)
+          .push({
+            tipo: 'conclusao',
+            timestamp: ServerValue.TIMESTAMP,
+            success: true,
+            destinatario: dadosOcorrencia.email,
+            certidaoUrl: dadosOcorrencia.certidao.url,
+            statusAnterior: statusAnterior,
+            novoStatus: novoStatus
+          });
 
-          console.log(`E-mail enviado automaticamente para ${dadosOcorrencia.email}`);
-          return { success: true };
-        } catch (error) {
-          console.error("Erro ao enviar e-mail automático:", error);
+        console.log(`E-mail de conclusão enviado com sucesso para ${dadosOcorrencia.email}`);
+        return { success: true };
+        
+      } catch (error) {
+        console.error("Erro ao enviar e-mail de conclusão:", error);
 
-          // Registrar a falha no banco de dados
-          await getDatabase()
-            .ref(`ocorrencias/${occurrenceId}/emailEnviado`)
-            .set({
-              timestamp: ServerValue.TIMESTAMP,
-              success: false,
-              error: error.message,
-            });
+        // Registrar a falha no log
+        await getDatabase()
+          .ref(`ocorrencias/${occurrenceId}/emailLogs`)
+          .push({
+            tipo: 'conclusao',
+            timestamp: ServerValue.TIMESTAMP,
+            success: false,
+            error: error.message,
+            destinatario: dadosOcorrencia.email,
+            statusAnterior: statusAnterior,
+            novoStatus: novoStatus
+          });
 
-          return { success: false, error: error.message };
-        }
-      } else {
-        console.log(`E-mail já foi enviado anteriormente para ocorrência ${occurrenceId}`);
+        return { success: false, error: error.message };
       }
     } else {
+      // Log quando não há dados suficientes para envio
       console.log(`Ocorrência ${occurrenceId} não tem os dados necessários para envio de e-mail: email=${!!dadosOcorrencia?.email}, certidao=${!!dadosOcorrencia?.certidao}, url=${!!dadosOcorrencia?.certidao?.url}`);
+      
+      await getDatabase()
+        .ref(`ocorrencias/${occurrenceId}/emailLogs`)
+        .push({
+          tipo: 'conclusao_sem_dados',
+          timestamp: ServerValue.TIMESTAMP,
+          success: false,
+          motivo: 'Dados insuficientes',
+          temEmail: !!dadosOcorrencia?.email,
+          temCertidao: !!dadosOcorrencia?.certidao,
+          temUrl: !!dadosOcorrencia?.certidao?.url,
+          statusAnterior: statusAnterior,
+          novoStatus: novoStatus
+        });
     }
   }
 
