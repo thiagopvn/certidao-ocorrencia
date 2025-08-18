@@ -308,10 +308,36 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
 
-        // Exibir mensagem de sucesso com alerta mais amigável
+        // Exibir mensagem de sucesso com informações completas
         showSuccessMessage(
-          `${formData.nome}, sua solicitação foi recebida com sucesso!`,
-          `Seu número de protocolo é: <strong>${occurrenceNumber}</strong>. Enviamos um email para o senhor confirmando a solicitação. Em breve entraremos novamente em contato pelo e-mail informado, não deixe de conferir a caixa de spam.`
+          `✅ Solicitação Enviada com Sucesso!`,
+          `
+            <div class="success-details">
+              <p><strong>${formData.nome}</strong>, sua solicitação de certidão de ocorrência foi enviada com sucesso!</p>
+              
+              <div class="protocolo-info">
+                <h4>📋 Seu Número de Protocolo:</h4>
+                <div class="protocolo-number">${occurrenceNumber}</div>
+                <small>Anote este número para acompanhar sua solicitação</small>
+              </div>
+              
+              <div class="email-info">
+                <h4>📧 Confirmação por E-mail:</h4>
+                <p>Enviamos um <strong>e-mail de confirmação</strong> para <strong>${formData.email}</strong> contendo:</p>
+                <ul>
+                  <li>✓ Número do protocolo</li>
+                  <li>✓ Dados da solicitação</li>
+                  <li>✓ Prazo estimado</li>
+                </ul>
+              </div>
+              
+              <div class="spam-warning">
+                <h4>⚠️ Importante:</h4>
+                <p><strong>Verifique sua caixa de SPAM/LIXO ELETRÔNICO</strong> caso não receba o e-mail em alguns minutos.</p>
+                <p>Em breve entraremos em contato novamente quando sua certidão estiver pronta.</p>
+              </div>
+            </div>
+          `
         );
 
         // Limpar o formulário após envio bem-sucedido
@@ -453,7 +479,9 @@ document.addEventListener("DOMContentLoaded", function () {
         border-radius: 8px;
         box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         width: 90%;
-        max-width: 500px;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
         animation: slideUp 0.3s;
       }
       .success-modal-header {
@@ -519,6 +547,81 @@ document.addEventListener("DOMContentLoaded", function () {
         border-radius: 4px;
         border: 1px solid rgba(59, 130, 246, 0.2);
       }
+      
+      /* Novos estilos para a mensagem de sucesso melhorada */
+      .success-details {
+        text-align: left;
+      }
+      .success-details > p {
+        font-size: 16px;
+        margin-bottom: 20px;
+        color: #374151;
+      }
+      .protocolo-info, .email-info, .spam-warning {
+        margin: 20px 0;
+        padding: 15px;
+        border-radius: 8px;
+      }
+      .protocolo-info {
+        background-color: #f0f9ff;
+        border: 2px solid #0284c7;
+      }
+      .protocolo-info h4 {
+        color: #0284c7;
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+      .protocolo-number {
+        font-family: 'Courier New', monospace;
+        font-size: 24px;
+        font-weight: bold;
+        color: #0284c7;
+        background-color: white;
+        padding: 10px;
+        border-radius: 6px;
+        text-align: center;
+        margin: 10px 0;
+        border: 1px solid #0284c7;
+      }
+      .email-info {
+        background-color: #f0f9f9;
+        border: 2px solid #10b981;
+      }
+      .email-info h4 {
+        color: #10b981;
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+      .email-info ul {
+        margin: 10px 0;
+        padding-left: 20px;
+      }
+      .email-info li {
+        margin: 5px 0;
+        color: #374151;
+      }
+      .spam-warning {
+        background-color: #fef3c7;
+        border: 2px solid #f59e0b;
+      }
+      .spam-warning h4 {
+        color: #f59e0b;
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+      .spam-warning p {
+        color: #92400e;
+        margin: 8px 0;
+        font-weight: 500;
+      }
+      .success-details small {
+        color: #6b7280;
+        font-style: italic;
+        display: block;
+        text-align: center;
+        margin-top: 5px;
+      }
+      
       @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
