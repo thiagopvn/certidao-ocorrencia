@@ -484,11 +484,13 @@ function updateUploadSectionVisibility(occurrence, clearFile = false) {
     // Mostrar seção de upload quando:
     // 1. Status atual é "Concluído" 
     // 2. Status está "Pendente" (para permitir anexar certidão)
+    // 3. Status está "Em andamento" (para permitir anexar certidão durante o trabalho)
     // Nota: Sempre mostrar para estes status, independente de ter certidão ou não
     
     const shouldShowUpload = 
-        currentStatus === 'Concluído' || 
-        currentStatus === 'Pendente';
+        currentStatus === 'Pendente' ||
+        currentStatus === 'Em andamento' ||
+        currentStatus === 'Concluído';
     
     if (shouldShowUpload) {
         uploadSection.style.display = 'block';
