@@ -482,9 +482,9 @@ function updateUploadSectionVisibility(occurrence, clearFile = false) {
     const currentStatus = statusSelect.value;
     
     // Mostrar seção de upload quando:
-    // 1. Status atual é "Concluído" E não tem certidão ainda
-    // 2. Status está sendo alterado para "Concluído" (independente de ter certidão)
-    // 3. Status está voltando para "Pendente" (para permitir reenvio)
+    // 1. Status atual é "Concluído" 
+    // 2. Status está "Pendente" (para permitir anexar certidão)
+    // Nota: Sempre mostrar para estes status, independente de ter certidão ou não
     
     const shouldShowUpload = 
         currentStatus === 'Concluído' || 
@@ -2255,6 +2255,11 @@ async function updateOccurrenceStatus(occurrenceId, newStatus, certidaoFile = nu
         // para permitir novo upload
         if (newStatus === 'Pendente') {
             updates.certidao = null;
+            
+            // Atualizar a visibilidade da seção de upload imediatamente
+            setTimeout(() => {
+                updateUploadSectionVisibility(AppState.currentOccurrence, false);
+            }, 100);
         }
         
         // Step 2: Processando arquivos
@@ -2337,9 +2342,15 @@ async function updateOccurrenceStatus(occurrenceId, newStatus, certidaoFile = nu
                 }
             }, 1500);
         } else {
-            // Se voltou para Pendente, mostrar mensagem de que pode reenviar
+            // Se voltou para Pendente, atualizar o modal e mostrar mensagem
             setTimeout(() => {
                 progressController.hide();
+                
+                // Recriar o modal com os dados atualizados
+                if (AppState.currentOccurrence) {
+                    createDetailModalComponent(AppState.currentOccurrence);
+                }
+                
                 showToast('Status alterado para Pendente. Você pode anexar uma nova certidão.', 'info');
             }, 2000);
         }
