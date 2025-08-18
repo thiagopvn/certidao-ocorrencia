@@ -701,8 +701,9 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     // Também limpar o interval se clicar fora do modal
-    modalOverlay.addEventListener("click", function (e) {
-      if (e.target === modalOverlay) {
+    const newModalOverlay = modalElement.querySelector('.success-modal-overlay');
+    newModalOverlay.addEventListener("click", function (e) {
+      if (e.target === newModalOverlay) {
         clearInterval(countdownInterval);
         document.body.removeChild(modalElement);
         window.location.reload();
@@ -1401,7 +1402,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Melhorar a experiência do upload de arquivos
   const fileInputs = document.querySelectorAll('input[type="file"]');
   fileInputs.forEach((input) => {
-    const fileUploadArea = input.closest(".file-upload-area");
+    const fileUploadArea = input.parentElement;
     if (fileUploadArea) {
       const fileText = fileUploadArea.querySelector("p");
       const originalText = fileText.textContent;
