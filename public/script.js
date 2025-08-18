@@ -340,11 +340,24 @@ document.addEventListener("DOMContentLoaded", function () {
           `
         );
 
-        // Limpar o formulário após envio bem-sucedido
-        formulario.reset();
+        // Operações de limpeza protegidas para não causar erro
+        try {
+          // Limpar o formulário após envio bem-sucedido
+          if (formulario) {
+            formulario.reset();
+          }
 
-        // Restaurar a data atual após reset
-        datasolicitacaoInput.value = dataFormatada;
+          // Restaurar a data atual após reset
+          if (datasolicitacaoInput && typeof dataFormatada !== 'undefined') {
+            datasolicitacaoInput.value = dataFormatada;
+          }
+        } catch (cleanupError) {
+          console.warn("Erro na limpeza do formulário (não crítico):", cleanupError);
+          // Não propagar este erro, pois o envio foi bem-sucedido
+        }
+        
+        // IMPORTANTE: Return aqui para evitar que execute o catch de erro
+        return;
       } catch (error) {
         console.error("Erro:", error);
         showErrorMessage(
