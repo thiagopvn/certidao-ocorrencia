@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pesquisa de Satisfação - GOCG</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --primary-light: #818cf8;
+            --primary-bg: #f5f3ff;
+            --success: #10b981;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius-sm: 0.25rem;
+            --radius: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            background-color: var(--gray-100);
+            color: var(--gray-800);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px 20px;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 650px;
+            overflow: hidden;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .header {
+            background-color: var(--primary);
+            color: white;
+            padding: 25px 30px;
+            position: relative;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .logo {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+        }
+
+        .logo-img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: contain;
+            background-color: white;
+            padding: 5px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .form-container {
+            padding: 30px;
+        }
+
+        .question {
+            background-color: white;
+            padding: 20px;
+            border-radius: var(--radius);
+            border: 1px solid var(--gray-200);
+            margin-bottom: 25px;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .question:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .question h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--gray-800);
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .question h2 .number {
+            background-color: var(--primary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .rating-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .rating-option {
+            flex: 1;
+            min-width: 60px;
+            text-align: center;
+            margin: 0 5px;
+        }
+
+        .rating-input {
+            position: absolute;
+            opacity: 0;
+        }
+
+        .rating-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .rating-circle {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 2px solid var(--gray-300);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--gray-500);
+            transition: all 0.2s ease;
+        }
+
+        .rating-text {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            text-align: center;
+        }
+
+        .rating-input:checked + .rating-label .rating-circle {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .rating-input:checked + .rating-label .rating-text {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .options-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .option-item:hover {
+            background-color: var(--primary-bg);
+        }
+
+        .option-item input {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--gray-700);
+            font-size: 0.95rem;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: vertical;
+            min-height: 100px;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .submit-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 14px 25px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .btn-submit {
+            background-color: var(--primary);
+            color: white;
+            min-width: 180px;
+        }
+
+        .btn-submit:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-submit:disabled {
+            background-color: var(--gray-400);
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .loading-spinner {
+            border: 4px solid var(--gray-200);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .thank-you {
+            text-align: center;
+            padding: 40px 30px;
+            display: none;
+        }
+
+        .thank-you-icon {
+            font-size: 4rem;
+            color: var(--success);
+            margin-bottom: 20px;
+        }
+
+        .thank-you h2 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--gray-800);
+        }
+
+        .thank-you p {
+            color: var(--gray-600);
+            margin-bottom: 25px;
+        }
+        
+        .required-mark {
+            color: var(--primary);
+            margin-left: 3px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 15px;
+            font-size: 0.8rem;
+            color: var(--gray-500);
+            border-top: 1px solid var(--gray-200);
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                max-width: 100%;
+            }
+
+            .header {
+                padding: 20px 15px;
+            }
+
+            .form-container {
+                padding: 20px 15px;
+            }
+
+            .rating-container {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .rating-option {
+                flex: 0 0 30%;
+                margin-bottom: 10px;
+            }
+
+            .rating-circle {
+                width: 38px;
+                height: 38px;
+                font-size: 0.9rem;
+            }
+        }
+        
+        /* Estilos para mensagens de erro/alerta */
+        .alert-message {
+            background-color: #feecdc;
+            border-left: 4px solid #f97316;
+            color: #7c2d12;
+            padding: 15px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+        }
+        
+        .error-icon {
+            color: #f97316;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="/bolachaGOCG.png" alt="GOCG" class="logo-img">
+            </div>
+            <h1>Sua Opinião é Importante para Nós</h1>
+            <p>Ajude-nos a melhorar nossos serviços respondendo a esta breve pesquisa</p>
+        </div>
+
+        <div id="feedback-form" class="form-container">
+            <form id="satisfaction-form">
+                <!-- Pergunta 1 -->
+                <div class="question">
+                    <h2><span class="number">1</span> Como você avalia o atendimento recebido durante todo o processo de solicitação da certidão?<span class="required-mark">*</span></h2>
+                    <div class="rating-container">
+                        <div class="rating-option">
+                            <input type="radio" name="atendimento" value="1" id="atendimento-1" class="rating-input" required>
+                            <label for="atendimento-1" class="rating-label">
+                                <div class="rating-circle">1</div>
+                                <div class="rating-text">Muito ruim</div>
+                            </label>
+                        </div>
+                        <div class="rating-option">
+                            <input type="radio" name="atendimento" value="2" id="atendimento-2" class="rating-input">
+                            <label for="atendimento-2" class="rating-label">
+                                <div class="rating-circle">2</div>
+                                <div class="rating-text">Ruim</div>
+                            </label>
+                        </div>
+                        <div class="rating-option">
+                            <input type="radio" name="atendimento" value="3" id="atendimento-3" class="rating-input">
+                            <label for="atendimento-3" class="rating-label">
+                                <div class="rating-circle">3</div>
+                                <div class="rating-text">Regular</div>
+                            </label>
+                        </div>
+                        <div class="rating-option">
+                            <input type="radio" name="atendimento" value="4" id="atendimento-4" class="rating-input">
+                            <label for="atendimento-4" class="rating-label">
+                                <div class="rating-circle">4</div>
+                                <div class="rating-text">Bom</div>
+                            </label>
+                        </div>
+                        <div class="rating-option">
+                            <input type="radio" name="atendimento" value="5" id="atendimento-5" class="rating-input">
+                            <label for="atendimento-5" class="rating-label">
+                                <div class="rating-circle">5</div>
+                                <div class="rating-text">Excelente</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pergunta 2 -->
+                <div class="question">
+                    <h2><span class="number">2</span> O tempo para a emissão da sua certidão atendeu às suas expectativas?<span class="required-mark">*</span></h2>
+                    <div class="options-group">
+                        <label class="option-item">
+                            <input type="radio" name="tempo" value="muito_rapido" required> Sim, foi mais rápido do que eu esperava
+                        </label>
+                        <label class="option-item">
+                            <input type="radio" name="tempo" value="adequado"> Sim, o tempo foi adequado
+                        </label>
+                        <label class="option-item">
+                            <input type="radio" name="tempo" value="demorado"> Não, demorou mais do que eu esperava
+                        </label>
+                        <label class="option-item">
+                            <input type="radio" name="tempo" value="muito_demorado"> Não, demorou muito além do aceitável
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Pergunta 3 -->
+                <div class="question">
+                    <h2><span class="number">3</span> Você tem algum comentário ou sugestão para melhorarmos nosso serviço?</h2>
+                    <div class="form-group">
+                        <textarea id="comentario" name="comentario" placeholder="Compartilhe sua opinião (opcional)"></textarea>
+                    </div>
+                </div>
+
+                <div class="submit-container">
+                    <button type="submit" class="btn btn-submit" id="submit-btn">
+                        <i class="fas fa-paper-plane"></i> Enviar Avaliação
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tela de carregamento -->
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <p>Enviando sua avaliação...</p>
+        </div>
+
+        <!-- Tela de agradecimento -->
+        <div id="thank-you" class="thank-you">
+            <div class="thank-you-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2>Agradecemos sua participação!</h2>
+            <p>Sua opinião é muito importante para continuarmos melhorando nossos serviços.</p>
+            <button class="btn btn-submit" onclick="window.close()">Fechar</button>
+        </div>
+
+        <footer>
+            Grupamento Operacional do Comando Geral - Sistema de Certidões
+        </footer>
+    </div>
+
+    <!-- Incluir Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <script>
+        // Configuração do Firebase
+        var firebaseConfig = {
+            apiKey: "AIzaSyD3tQJ5evRr8Skp9iMCLSXKIewJJWPmrII",
+            authDomain: "certidao-gocg.firebaseapp.com",
+            databaseURL: "https://certidao-gocg-default-rtdb.firebaseio.com",
+            projectId: "certidao-gocg",
+            storageBucket: "certidao-gocg.firebasestorage.app",
+            messagingSenderId: "684546571684",
+            appId: "1:684546571684:web:c104197a7c6b1c9f7a5531"
+        };
+
+        // Inicializar Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        
+        // Adicionar log de inicialização
+        console.log("Firebase inicializado com sucesso na página de feedback");
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Documento carregado, verificando parâmetros de URL");
+            
+            // Pegar ID da ocorrência da URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const occurrenceId = urlParams.get('id');
+            
+            console.log("ID encontrado na URL:", occurrenceId);
+            
+            // Verificar se o ID está presente
+            if (!occurrenceId) {
+                console.warn("ID da ocorrência não encontrado na URL");
+                // Adiciona mensagem para casos onde o ID não está presente
+                document.getElementById('feedback-form').innerHTML = `
+                    <div class="alert-message">
+                        <i class="fas fa-exclamation-circle error-icon"></i>
+                        <h3>Link de pesquisa inválido</h3>
+                        <p>O link para esta pesquisa parece não conter as informações necessárias. Por favor, acesse a pesquisa através do link enviado por e-mail.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Verificar se a ocorrência existe no banco de dados
+            const checkOccurrence = async () => {
+                try {
+                    console.log("Verificando se a ocorrência existe:", occurrenceId);
+                    const snapshot = await firebase.database().ref(`ocorrencias/${occurrenceId}`).once('value');
+                    
+                    if (!snapshot.exists()) {
+                        console.warn("Ocorrência não encontrada no banco de dados");
+                        document.getElementById('feedback-form').innerHTML = `
+                            <div class="alert-message">
+                                <i class="fas fa-exclamation-circle error-icon"></i>
+                                <h3>Ocorrência não encontrada</h3>
+                                <p>Não foi possível encontrar a ocorrência correspondente a este link. Por favor, verifique se o link está correto ou entre em contato com o suporte.</p>
+                            </div>
+                        `;
+                        return false;
+                    }
+                    
+                    console.log("Ocorrência encontrada no banco de dados");
+                    
+                    // Verificar se a pesquisa já foi respondida
+                    const pesquisaData = snapshot.val().pesquisaSatisfacao;
+                    if (pesquisaData && pesquisaData.respondido) {
+                        console.log("Pesquisa já foi respondida anteriormente");
+                        document.getElementById('feedback-form').innerHTML = `
+                            <div class="alert-message" style="background-color: #dcfce7; border-color: #10b981; color: #064e3b;">
+                                <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                                <h3>Pesquisa já respondida</h3>
+                                <p>Você já respondeu esta pesquisa anteriormente. Agradecemos sua participação!</p>
+                            </div>
+                        `;
+                        return false;
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error("Erro ao verificar ocorrência:", error);
+                    document.getElementById('feedback-form').innerHTML = `
+                        <div class="alert-message">
+                            <i class="fas fa-exclamation-circle error-icon"></i>
+                            <h3>Erro de conexão</h3>
+                            <p>Ocorreu um erro ao verificar a ocorrência. Por favor, tente novamente mais tarde.</p>
+                        </div>
+                    `;
+                    return false;
+                }
+            };
+            
+            // Verificar ocorrência e configurar formulário
+            checkOccurrence().then(isValid => {
+                if (isValid) {
+                    console.log("Configurando evento de envio do formulário");
+                    
+                    // Formulário de satisfação
+                    const satisfactionForm = document.getElementById('satisfaction-form');
+                    if (satisfactionForm) {
+                        satisfactionForm.addEventListener('submit', function(e) {
+                            e.preventDefault();
+                            submitFeedback(occurrenceId);
+                        });
+                    }
+                }
+            });
+        });
+
+        // Enviar feedback
+        function submitFeedback(occurrenceId) {
+            console.log("Iniciando envio de feedback para ocorrência:", occurrenceId);
+            
+            // Desabilitar botão de envio para evitar múltiplos envios
+            const submitBtn = document.getElementById('submit-btn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            }
+            
+            // Pegar valores do formulário
+            const atendimento = document.querySelector('input[name="atendimento"]:checked')?.value;
+            const tempo = document.querySelector('input[name="tempo"]:checked')?.value;
+            const comentario = document.getElementById('comentario').value;
+
+            // Validar dados básicos
+            if (!atendimento || !tempo) {
+                alert('Por favor, responda todas as perguntas marcadas com *');
+                
+                // Reabilitar botão
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Avaliação';
+                }
+                
+                return;
+            }
+
+            // Mostrar tela de carregamento
+            document.getElementById('feedback-form').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
+            // Preparar dados para envio
+            const feedbackData = {
+                atendimento: atendimento,
+                tempo: tempo,
+                comentario: comentario || '',
+                timestamp: Date.now(),
+                occurrenceId: occurrenceId
+            };
+
+            console.log("Dados do feedback:", feedbackData);
+
+            // Salvar no Firebase
+            firebase.database().ref('feedbacks').push(feedbackData)
+                .then(() => {
+                    console.log("Feedback salvo com sucesso no Firebase");
+                    
+                    // Atualizar status na ocorrência
+                    if (occurrenceId) {
+                        console.log("Atualizando status da pesquisa na ocorrência:", occurrenceId);
+                        return firebase.database().ref(`ocorrencias/${occurrenceId}/pesquisaSatisfacao`).update({
+                            respondido: true,
+                            dataResposta: Date.now()
+                        });
+                    }
+                    return Promise.resolve();
+                })
+                .then(() => {
+                    console.log("Status da pesquisa atualizado com sucesso");
+                    
+                    // Mostrar tela de agradecimento
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('thank-you').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Erro ao enviar feedback:', error);
+                    alert('Ocorreu um erro ao enviar sua avaliação. Por favor, tente novamente.');
+                    
+                    // Voltar para o formulário
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('feedback-form').style.display = 'block';
+                    
+                    // Reabilitar botão
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Avaliação';
+                    }
+                });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solicitação de Certidão de Ocorrência - GOCG</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
+    <!-- Firebase Config -->
+    <script src="firebase-config.js"></script>
+  </head>
+  <body>
+    <div id="imc-form">
+      <div class="header-section">
+        <div class="logo-container">
+          <img src="bolachaGOCG.png" alt="GOCG - Grupamento Operacional do Comando Geral" class="gocg-logo">
+        </div>
+        <div class="header-content">
+          <h1>Solicitação de Certidão de Ocorrência</h1>
+          <p class="header-subtitle">Grupamento Operacional do Comando Geral - GOCG</p>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-button active" onclick="openTab('form-tab')">
+          Formulário
+        </button>
+        <button class="tab-button" onclick="openTab('consulta-tab')">
+          Consultar Solicitações
+        </button>
+      </div>
+
+      <div id="form-tab" class="tab-content">
+        <!-- Progress Bar -->
+        <div class="wizard-progress">
+          <div class="progress-steps">
+            <div class="step active" data-step="1">
+              <div class="step-number">1</div>
+              <div class="step-label">Solicitante</div>
+            </div>
+            <div class="step" data-step="2">
+              <div class="step-number">2</div>
+              <div class="step-label">Ocorrência</div>
+            </div>
+            <div class="step" data-step="3">
+              <div class="step-number">3</div>
+              <div class="step-label">Documentos</div>
+            </div>
+          </div>
+        </div>
+
+        <form id="calc-form">
+          <!-- Step 1: Dados do Solicitante -->
+          <div class="form-step active" id="step-1">
+            <div class="step-header">
+              <h2><i class="fas fa-user"></i> Dados do Solicitante</h2>
+              <p>Preencha suas informações pessoais para prosseguir com a solicitação</p>
+            </div>
+
+            <div class="form-section">
+              <div class="form-group">
+                <label for="datasolicitacao">Data da Solicitação:</label>
+                <input
+                  type="text"
+                  name="datasolicitacao"
+                  id="datasolicitacao"
+                  readonly
+                />
+                <div id="datasolicitacao-error" style="color: red; display: none">
+                  Por favor, insira a data da solicitação.
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="nome">Nome do Solicitante:</label>
+                <input
+                  type="text"
+                  name="nome"
+                  id="nome"
+                  placeholder="Nome completo"
+                />
+                <div id="nome-error" style="color: red; display: none">
+                  Por favor, insira o seu nome completo.
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group half">
+                  <label for="cpf">CPF:</label>
+                  <input
+                    type="text"
+                    id="cpf"
+                    name="cpf"
+                    placeholder="000.000.000-00"
+                    maxlength="14"
+                    required
+                  />
+                </div>
+                <div class="form-group half">
+                  <label for="rg">RG:</label>
+                  <input
+                    type="text"
+                    id="rg"
+                    name="rg"
+                    placeholder="00.000.000-0"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group half">
+                  <label for="dataNascimento">Data de Nascimento:</label>
+                  <input
+                    type="date"
+                    id="dataNascimento"
+                    name="dataNascimento"
+                    required
+                  />
+                </div>
+                <div class="form-group half">
+                  <label for="telefone">Telefone:</label>
+                  <input
+                    type="tel"
+                    id="telefone"
+                    name="telefone"
+                    placeholder="(00) 00000-0000"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="enderecoSolicitante">Endereço do Solicitante:</label>
+                <input
+                  type="text"
+                  id="enderecoSolicitante"
+                  name="enderecoSolicitante"
+                  placeholder="Endereço completo"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="bairro">Bairro:</label>
+                <input
+                  type="text"
+                  id="bairro"
+                  name="bairro"
+                  placeholder="Informe o bairro"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="email">E-mail:</label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="wizard-navigation">
+              <button type="button" class="btn-next">
+                <i class="fas fa-arrow-right"></i> Próximo
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Dados da Ocorrência -->
+          <div class="form-step" id="step-2">
+            <div class="step-header">
+              <h2><i class="fas fa-clipboard-list"></i> Dados da Ocorrência</h2>
+              <p>Informe os detalhes sobre o incidente que você quer relatar</p>
+            </div>
+
+            <div class="form-section">
+              <div class="form-row">
+                <div class="form-group half">
+                  <label for="dataOcorrencia">Data da Ocorrência:</label>
+                  <input
+                    type="date"
+                    id="dataOcorrencia"
+                    name="dataOcorrencia"
+                    required
+                  />
+                </div>
+                <div class="form-group half">
+                  <label for="horaOcorrencia">Hora Aproximada da Ocorrência:</label>
+                  <input
+                    type="time"
+                    id="horaOcorrencia"
+                    name="horaOcorrencia"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="turnoOcorrencia">Turno:</label>
+                <select id="turnoOcorrencia" name="turnoOcorrencia" required>
+                  <option value="">Selecione o turno</option>
+                  <option value="Manhã">Manhã</option>
+                  <option value="Tarde">Tarde</option>
+                  <option value="Noite">Noite</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="enderecoOcorrencia">Endereço da Ocorrência:</label>
+                <input
+                  type="text"
+                  id="enderecoOcorrencia"
+                  name="enderecoOcorrencia"
+                  placeholder="Local onde ocorreu o incidente"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="relacaoSolicitante">Sua relação com a vítima:</label>
+                <select id="relacaoSolicitante" name="relacaoSolicitante" required>
+                  <option value="">Selecione sua relação</option>
+                  <option value="Própria Vítima">Própria Vítima</option>
+                  <option value="Pai">Pai</option>
+                  <option value="Mãe">Mãe</option>
+                  <option value="Parente">Parente</option>
+                  <option value="Outros">Outros</option>
+                </select>
+              </div>
+
+              <div class="form-group" id="outraRelacaoContainer" style="display: none;">
+                <label for="outraRelacaoInput">Especifique a relação:</label>
+                <input
+                  type="text"
+                  id="outraRelacaoInput"
+                  name="outraRelacaoInput"
+                  placeholder="Descreva sua relação com a vítima"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="descricao">Descrição:</label>
+                <textarea
+                  id="descricao"
+                  name="descricao"
+                  rows="4"
+                  placeholder="Descreva detalhadamente o que aconteceu"
+                  required
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="wizard-navigation">
+              <button type="button" class="btn-prev">
+                <i class="fas fa-arrow-left"></i> Anterior
+              </button>
+              <button type="button" class="btn-next">
+                <i class="fas fa-arrow-right"></i> Próximo
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3: Documentação -->
+          <div class="form-step" id="step-3">
+            <div class="step-header">
+              <h2><i class="fas fa-file-upload"></i> Documentação</h2>
+              <p>Anexe os documentos necessários para finalizar sua solicitação</p>
+            </div>
+
+            <div class="form-section">
+              <div class="documents-grid">
+                <div class="document-card required">
+                  <div class="document-header">
+                    <i class="fas fa-id-card"></i>
+                    <h3>Documento de Identidade</h3>
+                    <span class="required-badge">Obrigatório</span>
+                  </div>
+                  <div class="custom-file-input">
+                    <div class="file-upload-area">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                      <p>Clique para selecionar ou arraste o arquivo</p>
+                      <input
+                        type="file"
+                        id="documentoIdentidade"
+                        name="documentoIdentidade"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <small>Formatos aceitos: PDF, JPG, JPEG, PNG</small>
+                </div>
+
+                <div class="document-card required">
+                  <div class="document-header">
+                    <i class="fas fa-home"></i>
+                    <h3>Comprovante de Residência</h3>
+                    <span class="required-badge">Obrigatório</span>
+                  </div>
+                  <div class="custom-file-input">
+                    <div class="file-upload-area">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                      <p>Clique para selecionar ou arraste o arquivo</p>
+                      <input
+                        type="file"
+                        id="comprovanteResidencia"
+                        name="comprovanteResidencia"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <small>Formatos aceitos: PDF, JPG, JPEG, PNG</small>
+                </div>
+
+                <div class="document-card conditional-required">
+                  <div class="document-header">
+                    <i class="fas fa-car"></i>
+                    <h3>Documento do Veículo</h3>
+                    <span class="conditional-badge">Obrigatório para automóveis</span>
+                  </div>
+                  <div class="conditional-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Obrigatório para solicitações envolvendo automóveis</span>
+                  </div>
+                  <div class="custom-file-input">
+                    <div class="file-upload-area">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                      <p>Clique para selecionar ou arraste o arquivo</p>
+                      <input
+                        type="file"
+                        id="documentoCarro"
+                        name="documentoCarro"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                      />
+                    </div>
+                  </div>
+                  <small>Formatos aceitos: PDF, JPG, JPEG, PNG (CRLV, CRV ou documentos similares)</small>
+                </div>
+
+                <div class="document-card">
+                  <div class="document-header">
+                    <i class="fas fa-file-alt"></i>
+                    <h3>Outros Documentos</h3>
+                    <span class="optional-badge">Opcional</span>
+                  </div>
+                  <div class="custom-file-input">
+                    <div class="file-upload-area">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                      <p>Clique para selecionar ou arraste os arquivos</p>
+                      <input
+                        type="file"
+                        id="outrosDocumentos"
+                        name="outrosDocumentos"
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                        multiple
+                      />
+                    </div>
+                  </div>
+                  <small>Múltiplos arquivos aceitos</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="wizard-navigation">
+              <button type="button" class="btn-prev">
+                <i class="fas fa-arrow-left"></i> Anterior
+              </button>
+              <button type="submit" class="btn-submit">
+                <i class="fas fa-paper-plane"></i> Enviar solicitação
+              </button>
+            </div>
+          </div>
+
+          <input type="hidden" id="categoria" name="categoria" />
+        </form>
+      </div>
+
+      <div id="consulta-tab" class="tab-content" style="display: none">
+        <div class="search-container">
+          <h2>Consultar Ocorrências</h2>
+          <div class="search-form">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Digite o CPF (ex: 000.000.000-00)"
+              maxlength="14"
+            />
+            <input type="hidden" id="search-filter" value="cpf" />
+            <button id="search-button">
+              <i class="fas fa-search"></i> Buscar
+            </button>
+          </div>
+          <div class="filter-status">
+            <label>Filtrar por status:</label>
+            <div class="select-wrapper">
+              <select id="status-filter">
+                <option value="Pendente">Pendente</option>
+                <option value="Concluído">Concluído</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="ocorrencias-container" class="ocorrencias-grid">
+          <!-- Mensagem de segurança padrão será exibida aqui -->
+          <div class="security-message">
+            <i class="fas fa-lock"></i>
+            <p>
+              Por motivos de segurança, você precisa digitar o CPF para
+              visualizar as ocorrências.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal para visualização de detalhes -->
+    <div id="detail-modal" class="modal-overlay" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modal-title">Detalhes da Ocorrência</h2>
+          <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body" id="modal-body">
+          <!-- Conteúdo preenchido dinamicamente -->
+        </div>
+        <div class="modal-footer">
+          <button class="close-btn">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - Sistema de Certidões GOCG</title>
+    
+    <!-- Meta tags -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <meta name="theme-color" content="#DC2626">
+    
+    <!-- Fontes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Estilos -->
+    <link rel="stylesheet" href="admin.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
+    
+    <!-- Firebase Config -->
+    <script src="firebase-config.js"></script>
+</head>
+<body>
+    <!-- Tela de Login -->
+    <div id="login-container" class="login-container">
+        <div class="login-background">
+            <div class="login-pattern"></div>
+        </div>
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="/bolachaGOCG.png" alt="Logo GOCG" class="logo-img">
+            </div>
+            <div class="login-content">
+                <h1 class="login-title">Painel Administrativo</h1>
+                <p class="login-subtitle">Sistema de Certidões de Ocorrência</p>
+                
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label class="form-label" for="email">E-mail</label>
+                        <div class="input-group">
+                            <i class="fas fa-envelope input-icon"></i>
+                            <input 
+                                type="email" 
+                                id="email" 
+                                class="form-input" 
+                                placeholder="admin@gocg.gov.br" 
+                                required
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="password">Senha</label>
+                        <div class="input-group">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                class="form-input" 
+                                placeholder="••••••••" 
+                                required
+                            >
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="login-button" class="btn-login">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Entrar no Sistema</span>
+                    </button>
+                    
+                    <div id="login-error" class="login-error"></div>
+                </form>
+                
+                <div class="login-footer">
+                    <p>GOCG - Grupamento Operacional do Comando Geral</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Principal -->
+    <div id="admin-dashboard" class="admin-dashboard" style="display: none;">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <img src="/bolachaGOCG.png" alt="Logo GOCG" class="sidebar-logo">
+                <h2 class="sidebar-title">GOCG Admin</h2>
+            </div>
+            
+            <div class="sidebar-user">
+                <div class="user-avatar">
+                    <img src="/bolachaGOCG.png" alt="Avatar GOCG" class="user-avatar-img">
+                </div>
+                <div class="user-info">
+                    <span class="user-name" id="user-email">admin@gocg.gov.br</span>
+                    <span class="user-role">Administrador</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-link active" data-page="dashboard">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-link" data-page="pending">
+                    <i class="fas fa-clock"></i>
+                    <span>Pendentes</span>
+                    <span class="nav-badge" id="pending-count">0</span>
+                </a>
+                <a href="#" class="nav-link" data-page="in-progress">
+                    <i class="fas fa-spinner"></i>
+                    <span>Em Andamento</span>
+                    <span class="nav-badge" id="inprogress-count">0</span>
+                </a>
+                <a href="#" class="nav-link" data-page="completed">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Concluídas</span>
+                    <span class="nav-badge" id="completed-count">0</span>
+                </a>
+                <a href="#" class="nav-link" data-page="canceled">
+                    <i class="fas fa-ban"></i>
+                    <span>Canceladas</span>
+                    <span class="nav-badge" id="canceled-count">0</span>
+                </a>
+                <a href="#" class="nav-link" data-page="all">
+                    <i class="fas fa-list"></i>
+                    <span>Todas</span>
+                </a>
+                <a href="#" class="nav-link" data-page="feedbacks">
+                    <i class="fas fa-star"></i>
+                    <span>Feedbacks</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="logout-button" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Sair</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button id="sidebar-toggle" class="sidebar-toggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="header-logo">
+                        <img src="/bolachaGOCG.png" alt="Logo GOCG" class="header-logo-img">
+                    </div>
+                    <h1 id="page-title" class="page-title">Dashboard</h1>
+                </div>
+                
+                <div class="header-right">
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input 
+                            type="text" 
+                            id="search-input" 
+                            placeholder="Buscar por número, nome ou CPF..."
+                            class="search-input"
+                        >
+                    </div>
+                    
+                    <button class="btn-icon" id="notifications-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notification-count">0</span>
+                    </button>
+                    
+                    <button class="btn-icon" id="refresh-btn">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="admin-page active">
+                <!-- Métricas -->
+                <div id="metrics-container" class="metrics-grid">
+                    <!-- Cards de métricas serão inseridos aqui -->
+                </div>
+
+                <!-- Gráficos -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Solicitações por Status</h3>
+                            <button class="btn-icon-sm">
+                                <i class="fas fa-ellipsis-h"></i>
+                            </button>
+                        </div>
+                        <div class="chart-body">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Volume nos Últimos 30 Dias</h3>
+                            <button class="btn-icon-sm">
+                                <i class="fas fa-ellipsis-h"></i>
+                            </button>
+                        </div>
+                        <div class="chart-body">
+                            <canvas id="volumeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feedbacks Recentes -->
+                <div class="feedbacks-section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="fas fa-star"></i>
+                            Últimos Feedbacks
+                        </h2>
+                        <button class="btn-secondary" data-page="feedbacks">
+                            Ver Todos
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <div id="feedbacks-container" class="feedbacks-grid">
+                        <!-- Feedbacks serão inseridos aqui -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Page -->
+            <div id="pending-page" class="admin-page">
+                <div class="page-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-clock"></i>
+                        Solicitações Pendentes
+                    </h2>
+                    <div class="page-actions">
+                        <select id="filter-date" class="filter-select">
+                            <option value="all">Todas as datas</option>
+                            <option value="today">Hoje</option>
+                            <option value="week">Esta semana</option>
+                            <option value="month">Este mês</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="pending-list" class="occurrence-table-container">
+                    <!-- Tabela será inserida aqui -->
+                </div>
+            </div>
+
+            <!-- In Progress Page -->
+            <div id="in-progress-page" class="admin-page">
+                <div class="page-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-spinner"></i>
+                        Solicitações Em Andamento
+                    </h2>
+                </div>
+                <div id="inprogress-list" class="occurrence-table-container">
+                    <!-- Tabela será inserida aqui -->
+                </div>
+            </div>
+
+            <!-- Completed Page -->
+            <div id="completed-page" class="admin-page">
+                <div class="page-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-check-circle"></i>
+                        Solicitações Concluídas
+                    </h2>
+                </div>
+                <div id="completed-list" class="occurrence-table-container">
+                    <!-- Tabela será inserida aqui -->
+                </div>
+            </div>
+
+            <!-- Canceled Page -->
+            <div id="canceled-page" class="admin-page">
+                <div class="page-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-ban"></i>
+                        Solicitações Canceladas
+                    </h2>
+                </div>
+                <div id="canceled-list" class="occurrence-table-container">
+                    <!-- Tabela será inserida aqui -->
+                </div>
+            </div>
+
+            <!-- All Occurrences Page -->
+            <div id="all-page" class="admin-page">
+                <div class="page-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-list"></i>
+                        Todas as Solicitações
+                    </h2>
+                </div>
+                <div id="all-list" class="occurrence-table-container">
+                    <!-- Tabela será inserida aqui -->
+                </div>
+            </div>
+
+            <!-- Feedbacks Page -->
+            <div id="feedbacks-page" class="admin-page">
+                <div class="page-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-star"></i>
+                        Feedbacks dos Usuários
+                    </h2>
+                </div>
+                <div id="feedbacks-list" class="feedbacks-full-grid">
+                    <!-- Feedbacks serão inseridos aqui -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Detalhes -->
+    <div id="detail-modal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 id="modal-title" class="modal-title">Detalhes da Ocorrência</h2>
+                <button class="modal-close" id="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modal-body" class="modal-body">
+                <!-- Conteúdo será inserido dinamicamente -->
+            </div>
+            <div class="modal-footer">
+                <div class="modal-actions">
+                    <div class="action-group">
+                        <label for="status-select">Status:</label>
+                        <select id="status-select" class="status-select">
+                            <option value="Pendente">Pendente</option>
+                            <option value="Em andamento">Em andamento</option>
+                            <option value="Concluído">Concluído</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                    
+                    <div class="upload-section" id="upload-section">
+                        <div class="upload-dropzone" id="upload-dropzone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Arraste a certidão aqui ou clique para selecionar</p>
+                            <input type="file" id="certidao-file" accept=".pdf,.jpg,.jpeg,.png" hidden>
+                        </div>
+                        <div id="file-info"></div>
+                    </div>
+                    
+                    <button id="update-status-btn" class="btn-primary">
+                        <i class="fas fa-save"></i>
+                        Atualizar Status
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Notification Panel -->
+    <div id="notifications-panel" class="notifications-panel">
+        <div class="notifications-header">
+            <h3>Notificações</h3>
+            <button id="close-notifications" class="btn-icon-sm">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="notifications-list" class="notifications-list">
+            <!-- Notificações serão inseridas aqui -->
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,783 @@
+================================================================================
+                    DOCUMENTAÇÃO DETALHADA DO SISTEMA DE CERTIDÕES
+                           Grupamento Operacional do Comando Geral
+================================================================================
+
+ÍNDICE:
+1. VISÃO GERAL DO PROJETO
+2. ESTRUTURA DE PASTAS
+3. ARQUIVOS DE CONFIGURAÇÃO
+4. FRONTEND - INTERFACE DO USUÁRIO
+5. BACKEND - FIREBASE FUNCTIONS
+6. FUNCIONALIDADES ESPECÍFICAS
+7. FLUXO DE DADOS
+8. SEGURANÇA E AUTENTICAÇÃO
+
+================================================================================
+1. VISÃO GERAL DO PROJETO
+================================================================================
+
+O Sistema de Certidões de Ocorrência é uma aplicação web desenvolvida para o
+Grupamento Operacional do Comando Geral (GOCG) que permite aos cidadãos
+solicitarem certidões de ocorrência online e aos administradores gerenciarem
+essas solicitações.
+
+TECNOLOGIAS UTILIZADAS:
+- Frontend: HTML5, CSS3, JavaScript Vanilla
+- Backend: Firebase Functions (Node.js)
+- Banco de Dados: Firebase Realtime Database
+- Armazenamento: Firebase Storage
+- Autenticação: Firebase Authentication
+- Hospedagem: Firebase Hosting
+- Email: Nodemailer com Gmail SMTP
+
+================================================================================
+2. ESTRUTURA DE PASTAS
+================================================================================
+
+RAIZ DO PROJETO:
+/
+├── functions/                  # Backend - Firebase Functions
+│   ├── index.js               # Todas as funções do backend
+│   ├── package.json           # Dependências do backend
+│   ├── package-lock.json      # Lock das dependências
+│   └── bolachaGOCG.png        # Logo do GOCG para emails
+├── public/                     # Frontend - Interface web
+│   ├── index.html             # Página principal (formulário cidadão)
+│   ├── admin.html             # Painel administrativo
+│   ├── feedback.html          # Página de pesquisa de satisfação
+│   ├── script.js              # JavaScript da página principal
+│   ├── admin.js               # JavaScript do painel admin
+│   ├── admin-fixes.js         # Correções específicas do admin
+│   ├── style.css              # Estilos da página principal
+│   ├── admin.css              # Estilos do painel administrativo
+│   ├── firebase-config.js     # Configuração do Firebase
+│   ├── vercel.json            # Configuração para deploy no Vercel
+│   ├── bolachaGOCG.png        # Logo do GOCG
+│   ├── css/
+│   │   └── style.css          # Estilos adicionais
+│   └── js/
+│       └── feedback.js        # JavaScript da página de feedback
+├── firebase.json               # Configuração do Firebase
+├── cors.json                   # Configuração de CORS
+└── CLAUDE.md                   # Documentação para Claude Code
+
+================================================================================
+3. ARQUIVOS DE CONFIGURAÇÃO
+================================================================================
+
+3.1. firebase.json
+--------------------------------------------------------------------------------
+PROPÓSITO: Configuração principal do projeto Firebase
+CONTEÚDO:
+- Configurações das Functions (pasta source, codebase, arquivos ignorados)
+- Configurações do Hosting (pasta public, arquivos ignorados, rewrites)
+- Redirecionamentos de rotas (/feedback → /feedback.html, /admin → /admin.html)
+
+FUNCIONALIDADES:
+- Define que as functions estão na pasta "functions"
+- Configura o hosting para servir arquivos da pasta "public"
+- Ignora node_modules, .git e logs durante o deploy
+- Cria rotas amigáveis para páginas específicas
+
+3.2. cors.json
+--------------------------------------------------------------------------------
+PROPÓSITO: Configuração de Cross-Origin Resource Sharing
+CONTEÚDO:
+- Permite requisições de qualquer origem (*)
+- Configura métodos HTTP permitidos
+- Define headers aceitos
+
+IMPORTÂNCIA:
+- Necessário para o funcionamento das Firebase Functions
+- Permite que o frontend faça chamadas para as functions
+- Configurado para desenvolvimento (permitir todas as origens)
+
+3.3. functions/package.json
+--------------------------------------------------------------------------------
+PROPÓSITO: Gerenciamento de dependências do backend
+SCRIPTS DISPONÍVEIS:
+- "serve": Inicia emulador local das functions
+- "shell": Abre shell interativo das functions
+- "start": Alias para o shell
+- "deploy": Deploy apenas das functions
+- "logs": Visualiza logs das functions
+
+DEPENDÊNCIAS PRINCIPAIS:
+- firebase-admin: SDK admin do Firebase
+- firebase-functions: Framework para Cloud Functions
+- nodemailer: Envio de emails
+- busboy: Parse de dados multipart/form-data
+
+VERSÃO NODE: 18 (especificada na configuração)
+
+================================================================================
+4. FRONTEND - INTERFACE DO USUÁRIO
+================================================================================
+
+4.1. public/index.html
+--------------------------------------------------------------------------------
+PROPÓSITO: Página principal onde cidadãos fazem solicitações
+
+ESTRUTURA:
+- HEAD: Meta tags, links para CSS e Firebase SDKs
+- BODY: Formulário de solicitação e aba de consulta
+
+SEÇÕES PRINCIPAIS:
+
+A) Formulário de Solicitação:
+   - Dados pessoais (nome, CPF, RG, data nascimento, endereço, email, telefone)
+   - Dados da ocorrência (data, hora, local, descrição)
+   - Upload de documentos (identidade, comprovante residência, doc. carro, outros)
+   - Data de solicitação (preenchida automaticamente)
+
+B) Aba de Consulta:
+   - Campo para inserir CPF
+   - Filtro por status (Pendente/Concluído)
+   - Container para exibir resultados
+   - Mensagem de segurança padrão
+
+C) Modal de Detalhes:
+   - Exibe informações completas de uma ocorrência
+   - Permite download de documentos (apenas para o titular do CPF)
+   - Status da solicitação e emails enviados
+
+RECURSOS DE SEGURANÇA:
+- Validação de campos obrigatórios
+- Formatação automática de CPF e telefone
+- Restrição de acesso por CPF (usuário só vê suas próprias solicitações)
+
+4.2. public/script.js
+--------------------------------------------------------------------------------
+PROPÓSITO: Lógica JavaScript da página principal
+
+FUNCIONALIDADES PRINCIPAIS:
+
+A) Gerenciamento de Abas:
+   - openTab(): Alterna entre formulário e consulta
+   - Limpa resultados ao trocar para aba de consulta
+   - Foca automaticamente no campo de busca
+
+B) Envio do Formulário:
+   - Validação de campos obrigatórios
+   - Geração de número único da ocorrência (OCR-XXXXXX)
+   - Upload de arquivos para Firebase Storage
+   - Salvamento de dados no Realtime Database
+   - Envio de email de confirmação
+   - Exibição de feedback visual (loading, sucesso, erro)
+
+C) Consulta de Ocorrências:
+   - searchOcorrencias(): Busca por CPF e status
+   - loadOcorrencias(): Carrega e filtra ocorrências
+   - createOcorrenciaCard(): Cria cards visuais para cada ocorrência
+   - viewOcorrenciaDetails(): Exibe modal com detalhes completos
+
+D) Upload de Arquivos:
+   - uploadFilesToFirebase(): Função assíncrona para upload
+   - Organiza arquivos por tipo em pastas específicas
+   - Gera URLs de download para acesso posterior
+   - Suporte a múltiplos arquivos em "outros documentos"
+
+E) Interface de Usuário:
+   - Formatação automática de CPF (XXX.XXX.XXX-XX)
+   - Formatação automática de telefone ((XX) XXXXX-XXXX)
+   - Drag & drop para upload de arquivos
+   - Botões de remoção de arquivos selecionados
+   - Modais responsivos para sucesso/erro
+
+F) Controles de Segurança:
+   - Flag isSubmitting para prevenir envios múltiplos
+   - Validação de CPF (11 dígitos)
+   - Filtragem por CPF (usuário só vê suas ocorrências)
+   - Timeout para operações de upload
+
+4.3. public/admin.html
+--------------------------------------------------------------------------------
+PROPÓSITO: Interface administrativa para gerenciar solicitações
+
+ESTRUTURA:
+
+A) Container de Login:
+   - Formulário com email e senha
+   - Validação de credenciais via Firebase Auth
+   - Mensagens de erro
+
+B) Dashboard Administrativo:
+   - Sidebar com navegação
+   - Perfil do usuário logado
+   - Contadores de status em tempo real
+   - Área principal para exibir conteúdo
+
+C) Seções do Dashboard:
+   - Ocorrências Pendentes: Lista solicitações aguardando análise
+   - Ocorrências Concluídas: Lista solicitações finalizadas
+   - Relatórios: Visualização de estatísticas
+   - Configurações: Ajustes do sistema
+
+FUNCIONALIDADES ADMINISTRATIVAS:
+- Visualização detalhada de todas as ocorrências
+- Upload de certidões PDF
+- Alteração de status (Pendente → Concluído)
+- Reenvio manual de emails
+- Download de documentos anexados
+- Relatórios de produtividade
+
+4.4. public/admin.js
+--------------------------------------------------------------------------------
+PROPÓSITO: Lógica JavaScript do painel administrativo
+
+FUNCIONALIDADES:
+
+A) Autenticação:
+   - Login via Firebase Authentication
+   - Logout com limpeza de sessão
+   - Persistência de login
+   - Redirecionamento automático
+
+B) Gerenciamento de Ocorrências:
+   - Carregamento de listas por status
+   - Atualização de status em tempo real
+   - Filtros e ordenação
+   - Paginação para grandes volumes
+
+C) Upload de Certidões:
+   - Interface para selecionar arquivo PDF
+   - Upload para Firebase Storage
+   - Atualização do banco de dados
+   - Envio automático de email com certidão
+
+D) Dashboard:
+   - Contadores em tempo real
+   - Gráficos de estatísticas
+   - Notificações de novas solicitações
+   - Atalhos para ações frequentes
+
+4.5. public/feedback.html
+--------------------------------------------------------------------------------
+PROPÓSITO: Página de pesquisa de satisfação
+
+CARACTERÍSTICAS:
+- Formulário simples com escala de satisfação
+- Campos para comentários e sugestões
+- Vinculação automática à ocorrência via URL parameter
+- Design responsivo e intuitivo
+
+4.6. public/js/feedback.js
+--------------------------------------------------------------------------------
+PROPÓSITO: Lógica da pesquisa de satisfação
+
+FUNCIONALIDADES:
+- Captura do ID da ocorrência via URL
+- Validação do formulário
+- Salvamento das respostas no banco
+- Agradecimento após envio
+
+4.7. Arquivos CSS
+--------------------------------------------------------------------------------
+A) public/style.css:
+   - Estilos da página principal
+   - Design responsivo
+   - Cores e tipografia consistentes
+   - Animações e transições
+
+B) public/admin.css:
+   - Estilos do painel administrativo
+   - Layout com sidebar
+   - Componentes específicos (tabelas, cards, modais)
+   - Tema escuro/claro
+
+4.8. public/firebase-config.js
+--------------------------------------------------------------------------------
+PROPÓSITO: Configuração e inicialização do Firebase
+
+CONTEÚDO:
+- Chaves de API e configurações do projeto
+- Inicialização condicional (evita duplicação)
+- Exportação de serviços para uso global (db, storage, functions)
+
+VARIÁVEIS GLOBAIS CRIADAS:
+- window.db: Referência ao Realtime Database
+- window.storage: Referência ao Storage
+- window.functions: Referência às Functions
+
+================================================================================
+5. BACKEND - FIREBASE FUNCTIONS
+================================================================================
+
+5.1. functions/index.js
+--------------------------------------------------------------------------------
+PROPÓSITO: Arquivo principal contendo todas as Cloud Functions
+
+ESTRUTURA GERAL:
+- Importações e configurações iniciais
+- Configuração do transporte de email
+- Funções HTTPS callable
+- Triggers de banco de dados
+- Funções agendadas (scheduled)
+
+CONFIGURAÇÕES INICIAIS:
+
+A) Importações:
+   - Firebase Admin SDK
+   - Firebase Functions v2
+   - Nodemailer para emails
+   - Parâmetros de configuração
+
+B) Inicialização:
+   - initializeApp(): Inicializa o Firebase Admin
+   - Configuração de credenciais de email
+   - Definição de secrets e strings de configuração
+
+C) Transporte de Email:
+   - getTransporter(): Configura Nodemailer com Gmail
+   - Autenticação via app password
+   - Fallback para desenvolvimento local
+
+FUNÇÕES HTTPS CALLABLE:
+
+5.1.1. enviarEmailCertidaoV2
+PROPÓSITO: Envio manual de email com certidão
+PARÂMETROS: destinatario, nome, numeroOcorrencia, certidaoURL
+FUNCIONAMENTO:
+- Valida parâmetros obrigatórios
+- Constrói template HTML do email
+- Inclui logo do GOCG como anexo
+- Envia email via Nodemailer
+- Registra status do envio no banco
+TRATAMENTO DE ERROS:
+- Log detalhado de erros
+- Registro de falhas no banco
+- Retorno de erro estruturado
+
+5.1.2. marcarNotificacaoLida
+PROPÓSITO: Marca notificações administrativas como lidas
+AUTENTICAÇÃO: Requer usuário autenticado
+PARÂMETROS: notificacaoId
+FUNCIONAMENTO:
+- Verifica autenticação do usuário
+- Atualiza campo 'lida' para true
+- Retorna confirmação de sucesso
+
+5.1.3. enviarEmailConfirmacao
+PROPÓSITO: Envio manual de email de confirmação
+PARÂMETROS: destinatario, nome, numeroOcorrencia
+FUNCIONAMENTO:
+- Similar ao envio de certidão, mas com template diferente
+- Inclui número de protocolo
+- Explica próximos passos do processo
+- Registra tentativa de envio
+
+5.1.4. uploadCertidao
+PROPÓSITO: Gera URL assinada para upload de certidão
+PARÂMETROS: file (metadata), occurrenceNumber
+FUNCIONAMENTO:
+- Valida parâmetros
+- Gera nome único para arquivo
+- Cria caminho organizado no Storage
+- Retorna URL assinada de 15 minutos
+- Permite upload direto do frontend
+
+5.1.5. reenviarEmailCertidao
+PROPÓSITO: Reenvio manual de email com certidão
+PARÂMETROS: occurrenceId
+FUNCIONAMENTO:
+- Busca dados da ocorrência
+- Valida existência de certidão e email
+- Reenvia email com template padrão
+- Registra o reenvio no histórico
+
+TRIGGERS DE BANCO DE DADOS:
+
+5.1.6. enviarEmailAutomatico
+TRIGGER: onValueUpdated("/ocorrencias/{occurrenceId}/status")
+PROPÓSITO: Envio automático quando status muda para "Concluído"
+FUNCIONAMENTO:
+- Detecta mudança de status
+- Verifica se há certidão disponível
+- Evita envios duplicados
+- Envia email automaticamente
+- Registra resultado da operação
+
+5.1.7. notificarStatusAtualizado
+TRIGGER: onValueUpdated("/ocorrencias/{occurrenceId}/status")
+PROPÓSITO: Cria notificações para administradores
+FUNCIONAMENTO:
+- Detecta qualquer mudança de status
+- Busca informações da ocorrência
+- Cria notificação no banco
+- Inclui dados relevantes (nome cliente, timestamps)
+
+5.1.8. enviarEmailNovaOcorrencia
+TRIGGER: onValueCreated("/ocorrencias/{occurrenceId}")
+PROPÓSITO: Confirmação automática de nova solicitação
+FUNCIONAMENTO:
+- Dispara quando nova ocorrência é criada
+- Envia email de confirmação imediatamente
+- Inclui número de protocolo
+- Explica processo e prazos
+
+5.1.9. notificarMudancaStatusEmail
+TRIGGER: onValueUpdated("/ocorrencias/{occurrenceId}/status")
+PROPÓSITO: Notificar mudanças de status (DESABILITADO)
+FUNCIONAMENTO:
+- Função desabilitada conforme solicitação
+- Apenas registra em log
+- Não envia emails de notificação
+
+5.1.10. atualizarContadores
+TRIGGER: onValueWritten("/ocorrencias/{occurrenceId}/status")
+PROPÓSITO: Mantém contadores de status atualizados
+FUNCIONAMENTO:
+- Usa transações para atomicidade
+- Decrementa contador anterior
+- Incrementa novo contador
+- Atualiza total geral
+
+FUNÇÕES AGENDADAS (SCHEDULED):
+
+5.1.11. enviarLembretesOcorrenciasPendentes
+AGENDA: "every day 09:00" (São Paulo)
+PROPÓSITO: Lembretes para ocorrências pendentes há mais de 7 dias
+FUNCIONAMENTO:
+- Busca ocorrências criadas há mais de 7 dias
+- Filtra apenas status "Pendente"
+- Evita spam (máximo 1 lembrete por semana)
+- Envia emails de lembrete
+- Registra histórico de lembretes
+
+5.1.12. limparNotificacoesAntigas
+AGENDA: "1 of month 00:00" (mensalmente)
+PROPÓSITO: Limpeza automática de notificações antigas
+FUNCIONAMENTO:
+- Remove notificações com mais de 30 dias
+- Melhora performance do sistema
+- Evita acúmulo desnecessário de dados
+
+5.1.13. gerarRelatorioMensal
+AGENDA: "1 of month 00:00" (mensalmente)
+PROPÓSITO: Relatórios automáticos de produtividade
+FUNCIONAMENTO:
+- Coleta dados do mês anterior
+- Conta ocorrências por status
+- Gera relatório estruturado
+- Salva em /relatorios/ no banco
+
+5.1.14. backupDadosSemanais
+AGENDA: "every monday 03:00" (semanalmente)
+PROPÓSITO: Backup automático dos dados
+FUNCIONAMENTO:
+- Copia todas as ocorrências
+- Organiza por data
+- Mantém apenas últimos 4 backups
+- Remove backups antigos automaticamente
+
+5.1.15. enviarPesquisaSatisfacao
+AGENDA: "every 5 minutes"
+PROPÓSITO: Envio automático de pesquisa de satisfação
+FUNCIONAMENTO:
+- Busca ocorrências concluídas nos últimos 10 minutos
+- Verifica se já foi enviada pesquisa
+- Envia email com link personalizado
+- Marca como enviado para evitar duplicatas
+
+TEMPLATES DE EMAIL:
+
+Todos os emails seguem padrão visual consistente:
+- Header com logo do GOCG
+- Cores institucionais (verde para sucesso, azul para informação)
+- Estrutura HTML responsiva
+- Rodapé com informações institucionais
+- Logo anexado como imagem inline
+
+TIPOS DE EMAIL:
+1. Confirmação de recebimento (nova solicitação)
+2. Certidão concluída (com link para download)
+3. Lembretes de pendências
+4. Pesquisa de satisfação
+
+================================================================================
+6. FUNCIONALIDADES ESPECÍFICAS
+================================================================================
+
+6.1. Sistema de Numeração
+--------------------------------------------------------------------------------
+FORMATO: OCR-XXXXXX (onde X são os últimos 6 dígitos do timestamp)
+GERAÇÃO: Date.now().toString().slice(-6)
+PROPÓSITO: Identificação única e fácil de lembrar
+
+6.2. Upload de Documentos
+--------------------------------------------------------------------------------
+ESTRUTURA NO STORAGE:
+/ocorrencias/{numeroOcorrencia}/
+├── identidade/
+├── residencia/
+├── carro/
+├── outros/
+└── certidao/
+
+TIPOS ACEITOS:
+- Documentos: PDF, JPG, JPEG, PNG
+- Outros: Inclui DOC, DOCX
+- Certidões: Apenas PDF
+
+SEGURANÇA:
+- URLs assinadas para upload
+- Validação de tipo de arquivo
+- Organização por pasta de ocorrência
+
+6.3. Sistema de Status
+--------------------------------------------------------------------------------
+ESTADOS POSSÍVEIS:
+- "Pendente": Solicitação aguardando análise
+- "Concluído": Certidão emitida e disponível
+
+TRANSIÇÕES:
+- Criação: Automaticamente "Pendente"
+- Conclusão: Alteração manual pelo admin
+- Sem estado intermediário ou cancelamento
+
+6.4. Notificações por Email
+--------------------------------------------------------------------------------
+MOMENTOS DE ENVIO:
+1. Criação da solicitação (imediato)
+2. Conclusão da certidão (automático)
+3. Lembretes (diário, se >7 dias pendente)
+4. Pesquisa de satisfação (5 min após conclusão)
+
+CONFIGURAÇÃO SMTP:
+- Servidor: Gmail SMTP
+- Porta: 587 (TLS)
+- Autenticação: App Password
+- Remetente: gocg.certidao@gmail.com
+
+6.5. Controle de Acesso
+--------------------------------------------------------------------------------
+CIDADÃOS:
+- Acesso apenas com CPF
+- Visualizam apenas suas solicitações
+- Download de documentos próprios
+- Consulta de status em tempo real
+
+ADMINISTRADORES:
+- Login com Firebase Authentication
+- Acesso a todas as ocorrências
+- Alteração de status
+- Upload de certidões
+- Visualização de relatórios
+
+6.6. Relatórios e Analytics
+--------------------------------------------------------------------------------
+CONTADORES EM TEMPO REAL:
+- Total de ocorrências
+- Pendentes
+- Concluídas
+
+RELATÓRIOS MENSAIS:
+- Período (mês/ano)
+- Totais por status
+- Lista detalhada de ocorrências
+- Data de geração
+
+BACKUPS:
+- Frequência: Semanal
+- Retenção: 4 backups
+- Localização: /backups/ no Realtime Database
+
+================================================================================
+7. FLUXO DE DADOS
+================================================================================
+
+7.1. Solicitação de Certidão
+--------------------------------------------------------------------------------
+1. PREENCHIMENTO DO FORMULÁRIO:
+   - Cidadão acessa index.html
+   - Preenche dados pessoais e da ocorrência
+   - Anexa documentos obrigatórios
+   - Submete formulário
+
+2. PROCESSAMENTO FRONTEND:
+   - Validação de campos obrigatórios
+   - Formatação de CPF e telefone
+   - Geração de número da ocorrência
+   - Upload de arquivos para Storage
+
+3. SALVAMENTO NO BANCO:
+   - Criação do registro em /ocorrencias/
+   - Status inicial "Pendente"
+   - URLs dos documentos anexados
+   - Timestamp de criação
+
+4. TRIGGER AUTOMÁTICO:
+   - enviarEmailNovaOcorrencia é disparado
+   - Email de confirmação enviado
+   - Registro do envio no banco
+
+5. FEEDBACK PARA USUÁRIO:
+   - Modal de sucesso exibido
+   - Número de protocolo informado
+   - Formulário limpo para nova solicitação
+
+7.2. Consulta de Status
+--------------------------------------------------------------------------------
+1. ENTRADA DO CPF:
+   - Cidadão acessa aba "Consultar Solicitações"
+   - Digita CPF (formatação automática)
+   - Seleciona status (Pendente/Concluído)
+
+2. BUSCA NO BANCO:
+   - Frontend consulta /ocorrencias/
+   - Filtra por CPF (apenas números)
+   - Aplica filtro de status
+
+3. EXIBIÇÃO DOS RESULTADOS:
+   - Cards com resumo das ocorrências
+   - Ordenação por data (mais recente primeiro)
+   - Botão "Ver Detalhes" para cada item
+
+4. VISUALIZAÇÃO DE DETALHES:
+   - Modal com informações completas
+   - Links para documentos (se for o titular)
+   - Status atual e histórico
+
+7.3. Processamento Administrativo
+--------------------------------------------------------------------------------
+1. LOGIN DO ADMINISTRADOR:
+   - Acesso a admin.html
+   - Autenticação via Firebase Auth
+   - Redirecionamento para dashboard
+
+2. GERENCIAMENTO DE OCORRÊNCIAS:
+   - Lista de pendentes carregada automaticamente
+   - Visualização de detalhes completos
+   - Ações disponíveis (alterar status, upload certidão)
+
+3. UPLOAD DE CERTIDÃO:
+   - Seleção de arquivo PDF
+   - Upload via URL assinada
+   - Atualização do registro no banco
+   - Mudança automática de status para "Concluído"
+
+4. TRIGGER DE CONCLUSÃO:
+   - enviarEmailAutomatico é disparado
+   - Email com certidão enviado automaticamente
+   - Notificação criada para outros admins
+
+7.4. Automações
+--------------------------------------------------------------------------------
+1. LEMBRETES DIÁRIOS (09:00):
+   - Função agenda busca pendências >7 dias
+   - Filtra quem não recebeu lembrete recente
+   - Envia emails de lembrete
+   - Registra envio para evitar spam
+
+2. PESQUISA DE SATISFAÇÃO (a cada 5 min):
+   - Busca conclusões dos últimos 10 minutos
+   - Verifica se pesquisa não foi enviada
+   - Envia email com link personalizado
+   - Marca como enviado
+
+3. LIMPEZA MENSAL (dia 1, 00:00):
+   - Remove notificações >30 dias
+   - Gera relatório do mês anterior
+   - Executa backup semanal (segunda, 03:00)
+
+================================================================================
+8. SEGURANÇA E AUTENTICAÇÃO
+================================================================================
+
+8.1. Autenticação de Administradores
+--------------------------------------------------------------------------------
+MÉTODO: Firebase Authentication
+CREDENCIAIS: Email/senha
+PERSISTÊNCIA: Session local
+LOGOUT: Limpeza completa da sessão
+
+FLUXO:
+1. Admin insere credenciais em admin.html
+2. Firebase Auth valida via servidor
+3. Token JWT gerado e armazenado
+4. Acesso liberado ao dashboard
+5. Token validado em cada operação
+
+8.2. Controle de Acesso de Cidadãos
+--------------------------------------------------------------------------------
+MÉTODO: Validação por CPF (client-side)
+LIMITAÇÃO: Usuário só vê próprias ocorrências
+IMPLEMENTAÇÃO: Filtro JavaScript no frontend
+
+PROCESSO:
+1. Cidadão insere CPF na consulta
+2. Frontend remove formatação (pontos/traços)
+3. Busca no banco filtra por CPF exato
+4. Apenas registros correspondentes são exibidos
+5. Downloads de documentos restritos ao titular
+
+NOTA DE SEGURANÇA:
+- Controle é feito no frontend (não há regras de segurança no banco)
+- Para maior segurança, seria necessário implementar Firebase Security Rules
+- Sistema atual confia na validação client-side
+
+8.3. Proteção de Dados
+--------------------------------------------------------------------------------
+DADOS SENSÍVEIS:
+- CPF, RG, dados pessoais
+- Documentos de identidade
+- Endereços e telefones
+
+MEDIDAS IMPLEMENTADAS:
+- HTTPS obrigatório (Firebase Hosting)
+- CORS configurado
+- Credenciais de email em variáveis de ambiente
+- URLs de Storage não são públicas
+
+MELHORIAS RECOMENDADAS:
+- Implementar Firebase Security Rules
+- Criptografia de dados sensíveis
+- Audit log de acessos
+- Rate limiting em consultas
+
+8.4. Validações
+--------------------------------------------------------------------------------
+FRONTEND:
+- Campos obrigatórios
+- Formato de CPF (11 dígitos)
+- Formato de email
+- Tipos de arquivo aceitos
+- Tamanho máximo de upload
+
+BACKEND:
+- Validação de parâmetros nas functions
+- Verificação de autenticação onde necessário
+- Sanitização de dados de entrada
+- Tratamento de erros estruturado
+
+================================================================================
+9. CONSIDERAÇÕES FINAIS
+================================================================================
+
+Este sistema foi desenvolvido para atender às necessidades específicas do GOCG,
+fornecendo uma interface simples para cidadãos e uma ferramenta robusta para
+administradores. A arquitetura baseada em Firebase oferece escalabilidade e
+confiabilidade, enquanto as automações reduzem a carga de trabalho manual.
+
+PONTOS FORTES:
+- Interface intuitiva e responsiva
+- Automações abrangentes de email
+- Backup e relatórios automáticos
+- Integração completa com Firebase
+
+OPORTUNIDADES DE MELHORIA:
+- Implementar Security Rules no banco
+- Adicionar autenticação de dois fatores
+- Criar dashboard com métricas avançadas
+- Implementar notificações push
+- Adicionar assinatura digital nas certidões
+
+MANUTENÇÃO:
+- Monitorar logs das functions regularmente
+- Verificar quotas do Firebase
+- Manter credenciais de email atualizadas
+- Revisar backups periodicamente
+- Atualizar dependências conforme necessário
+
+================================================================================

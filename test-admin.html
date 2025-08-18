@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Admin - Sistema de Certidões GOCG</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
+    
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste do Painel Administrativo</h1>
+        <p>Este teste verificará se todas as funções do admin.js estão funcionando corretamente.</p>
+        
+        <div id="status-container">
+            <div class="status loading">⏳ Inicializando teste...</div>
+        </div>
+        
+        <div>
+            <button onclick="testFirebaseInit()">🔥 Testar Firebase</button>
+            <button onclick="testAdminFunctions()">⚙️ Testar Funções Admin</button>
+            <button onclick="testOccurrenceCreation()">📝 Criar Ocorrência Teste</button>
+            <button onclick="testAdminComponents()">🧩 Testar Componentes</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3tQJ5evRr8Skp9iMCLSXKIewJJWPmrII",
+            authDomain: "certidao-gocg.firebaseapp.com",
+            databaseURL: "https://certidao-gocg-default-rtdb.firebaseio.com",
+            projectId: "certidao-gocg",
+            storageBucket: "certidao-gocg.firebasestorage.app",
+            messagingSenderId: "684546571684",
+            appId: "1:684546571684:web:c104197a7c6b1c9f7a5531"
+        };
+
+        // Inicializar Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+            window.db = firebase.database();
+            window.storage = firebase.storage();
+            window.functions = firebase.functions();
+            updateStatus('✅ Firebase inicializado com sucesso', 'success');
+        } catch (error) {
+            updateStatus('❌ Erro ao inicializar Firebase: ' + error.message, 'error');
+        }
+
+        function updateStatus(message, type = 'info') {
+            const container = document.getElementById('status-container');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            container.appendChild(statusDiv);
+            
+            statusDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function updateResults(content) {
+            document.getElementById('results').innerHTML = content;
+        }
+
+        async function testFirebaseInit() {
+            updateStatus('🔥 Testando inicialização do Firebase...', 'loading');
+            
+            try {
+                const testRef = firebase.database().ref('test_admin');
+                await testRef.set({
+                    timestamp: Date.now(),
+                    test: 'admin_test'
+                });
+                
+                const snapshot = await testRef.once('value');
+                if (snapshot.exists()) {
+                    await testRef.remove();
+                    updateStatus('✅ Firebase Database funcionando corretamente', 'success');
+                } else {
+                    updateStatus('❌ Problema com Firebase Database', 'error');
+                }
+            } catch (error) {
+                updateStatus('❌ Erro no Firebase: ' + error.message, 'error');
+            }
+        }
+
+        async function testAdminFunctions() {
+            updateStatus('⚙️ Testando funções utilitárias do admin...', 'loading');
+            
+            try {
+                // Testar função formatCPF se existir
+                if (typeof formatCPF === 'function') {
+                    const cpfTest = formatCPF('12345678901');
+                    updateStatus(`✅ formatCPF funcionando: ${cpfTest}`, 'success');
+                } else {
+                    updateStatus('⚠️ Função formatCPF não encontrada', 'error');
+                }
+
+                // Testar função formatPhone se existir
+                if (typeof formatPhone === 'function') {
+                    const phoneTest = formatPhone('11987654321');
+                    updateStatus(`✅ formatPhone funcionando: ${phoneTest}`, 'success');
+                } else {
+                    updateStatus('⚠️ Função formatPhone não encontrada', 'error');
+                }
+
+                // Testar função getStatusIcon se existir
+                if (typeof getStatusIcon === 'function') {
+                    const iconTest = getStatusIcon('Pendente');
+                    updateStatus(`✅ getStatusIcon funcionando: ${iconTest}`, 'success');
+                } else {
+                    updateStatus('⚠️ Função getStatusIcon não encontrada', 'error');
+                }
+
+                // Testar AppState se existir
+                if (typeof AppState !== 'undefined') {
+                    updateStatus('✅ AppState definido corretamente', 'success');
+                } else {
+                    updateStatus('⚠️ AppState não encontrado', 'error');
+                }
+
+            } catch (error) {
+                updateStatus('❌ Erro ao testar funções: ' + error.message, 'error');
+            }
+        }
+
+        async function testOccurrenceCreation() {
+            updateStatus('📝 Criando ocorrência de teste...', 'loading');
+            
+            try {
+                const testOccurrence = {
+                    occurrenceNumber: 'TEST-' + Date.now(),
+                    nome: 'João da Silva Teste',
+                    cpf: '123.456.789-01',
+                    rg: '12.345.678-9',
+                    email: 'teste@teste.com',
+                    telefone: '(11) 98765-4321',
+                    status: 'Pendente',
+                    dataOcorrencia: '2024-01-15',
+                    horaOcorrencia: '14:30',
+                    turno: 'Tarde',
+                    enderecoOcorrencia: 'Rua Teste, 123 - Centro',
+                    descricao: 'Ocorrência de teste criada automaticamente para verificar funcionamento do sistema.',
+                    timestamp: Date.now(),
+                    bairro: 'Centro',
+                    enderecoSolicitante: 'Rua do Solicitante, 456',
+                    relacaoSolicitante: 'Própria vítima',
+                    dataNascimento: '1990-01-01'
+                };
+
+                const occRef = firebase.database().ref(`ocorrencias/${testOccurrence.occurrenceNumber}`);
+                await occRef.set(testOccurrence);
+                
+                updateStatus(`✅ Ocorrência teste criada: ${testOccurrence.occurrenceNumber}`, 'success');
+                
+                // Verificar se foi salva
+                const snapshot = await occRef.once('value');
+                if (snapshot.exists()) {
+                    updateStatus('✅ Ocorrência confirmada no banco de dados', 'success');
+                    
+                    updateResults(`
+                        <h3>📋 Ocorrência de Teste Criada</h3>
+                        <pre>${JSON.stringify(testOccurrence, null, 2)}</pre>
+                        <p><strong>Agora você pode:</strong></p>
+                        <ul>
+                            <li>Abrir o painel administrativo</li>
+                            <li>Fazer login como admin</li>
+                            <li>Verificar se a ocorrência aparece na lista</li>
+                        </ul>
+                    `);
+                } else {
+                    updateStatus('❌ Ocorrência não foi salva corretamente', 'error');
+                }
+                
+            } catch (error) {
+                updateStatus('❌ Erro ao criar ocorrência: ' + error.message, 'error');
+            }
+        }
+
+        async function testAdminComponents() {
+            updateStatus('🧩 Testando componentes do admin...', 'loading');
+            
+            try {
+                // Verificar se funções de componente existem
+                const componentFunctions = [
+                    'createStatCardComponent',
+                    'createOccurrenceTableRowComponent',
+                    'createOccurrenceTableComponent',
+                    'createDetailModalComponent'
+                ];
+
+                let componentsFound = 0;
+                componentFunctions.forEach(funcName => {
+                    if (typeof window[funcName] === 'function') {
+                        updateStatus(`✅ ${funcName} encontrada`, 'success');
+                        componentsFound++;
+                    } else {
+                        updateStatus(`⚠️ ${funcName} não encontrada`, 'error');
+                    }
+                });
+
+                if (componentsFound === componentFunctions.length) {
+                    updateStatus('✅ Todos os componentes estão disponíveis', 'success');
+                } else {
+                    updateStatus(`⚠️ ${componentsFound}/${componentFunctions.length} componentes encontrados`, 'error');
+                }
+
+                // Tentar carregar admin.js dinamicamente para testar
+                const script = document.createElement('script');
+                script.src = 'admin.js';
+                script.onload = () => {
+                    updateStatus('✅ admin.js carregado com sucesso', 'success');
+                };
+                script.onerror = () => {
+                    updateStatus('❌ Erro ao carregar admin.js', 'error');
+                };
+                document.head.appendChild(script);
+
+            } catch (error) {
+                updateStatus('❌ Erro ao testar componentes: ' + error.message, 'error');
+            }
+        }
+
+        // Executar teste inicial automaticamente
+        window.addEventListener('load', () => {
+            setTimeout(testFirebaseInit, 1000);
+        });
+    </script>
+</body>
+</html>
