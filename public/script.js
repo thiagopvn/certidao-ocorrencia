@@ -445,7 +445,7 @@ document.addEventListener("DOMContentLoaded", function () {
             <h3>${title}</h3>
           </div>
           <div class="success-modal-body">
-            <p>${message}</p>
+            ${message}
             <div class="auto-reload-info">
               <i class="fas fa-info-circle"></i>
               <small>Esta página será recarregada automaticamente em <span class="countdown">10</span> segundos ou clique em OK para continuar.</small>
