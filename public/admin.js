@@ -421,7 +421,7 @@ function createDetailModalComponent(occurrence) {
     detailsTab.innerHTML = `
         <div class="info-grid">
             ${createInfoPairComponent('<i class="fas fa-calendar-day"></i> Data da Ocorrência', 
-                occurrence.dataOcorrencia ? new Date(occurrence.dataOcorrencia).toLocaleDateString('pt-BR') : 'N/A'
+                formatarDataString(occurrence.dataOcorrencia)
             ).outerHTML}
             ${createInfoPairComponent('<i class="fas fa-clock"></i> Hora', occurrence.horaOcorrencia).outerHTML}
             ${createInfoPairComponent('<i class="fas fa-sun"></i> Turno', occurrence.turno).outerHTML}
@@ -1060,6 +1060,18 @@ function formatCPF(cpf) {
 function formatPhone(phone) {
     if (!phone) return '';
     return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+}
+
+// Função auxiliar para formatar data sem bugs de fuso horário
+function formatarDataString(dataString) {
+    if (!dataString || typeof dataString !== 'string' || !dataString.includes('-')) {
+        return 'N/A';
+    }
+    const partes = dataString.split('-'); // Ex: ["2025", "08", "05"]
+    if (partes.length !== 3) {
+        return 'Data Inválida';
+    }
+    return `${partes[2]}/${partes[1]}/${partes[0]}`; // Retorna "05/08/2025"
 }
 
 function getStatusIcon(status) {
